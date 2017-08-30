@@ -5,6 +5,9 @@ Outline:
     - max_length
 - methods:
     - append, sample, refresh
+    
+Notes:
+- make sure the is_full method works
 '''
 from collections import deque
 import random
@@ -20,3 +23,8 @@ class Memory:
     # Sample will return a matrix
     def sample(self, amount):
         return random.sample(self.storage, amount)
+
+    def is_full(self):
+        if len(self.storage) == self.storage.maxlen:
+            return True
+        return False
