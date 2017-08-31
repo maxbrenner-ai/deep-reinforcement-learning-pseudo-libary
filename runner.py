@@ -66,154 +66,95 @@ class Runner:
 
         assert agent.uses_replay is not None, "`uses_replay` is still `None`, need to set it."
 
-    # def run(self):
-    #     if self.run_type is RunType.TRAIN:
-    #         assert self.agent.currently_used_policy is self.agent.policy, "While training the current policy should be the init one"
-    #
-    #     # If it needs to fill the mem and its not already doing that then fill it
-    #     if self.agent.uses_replay is True and self.run_type is not RunType.RAND_FILL:
-    #         mem_filler = Runner(RunType.RAND_FILL, self.agent, self.env, None, self.nb_steps_ep_max, False)
-    #         mem_filler.run()
-    #
-    #     # Now temp replace the pol if rand_fill or test
-    #     self.temp_replace_policy()
-    #
-    #
-    #
-    #
-    #     # At very end reset the policy
-    #     self.reset_policy()
-    #
-    # def temp_replace_policy(self):
-    #     if self.run_type is RunType.RAND_FILL:
-    #         self.agent.currently_used_policy = RandomPolicy()
-    #     if self.run_type is RunType.TEST:
-    #         self.agent.currently_used_policy = GreedyPolicy()
-    #
-    #
-    # def reset_policy(self):
-    #     self.agent.currently_used_policy = self.agent.policy
+    def run(self):
+        if self.run_type is RunType.TRAIN:
+            assert self.agent.currently_used_policy is self.agent.policy, "While training the current policy should be the init one"
 
-    # Here is where i randomly fill the memory up for the agent, and have it not count against the stats
-    def fill_memory(self, agent, env, nb_steps_ep_max):
-        print("Filling Memory...")
+        # If it needs to fill the mem and its not already doing that then fill it
+        if self.agent.uses_replay is True and self.run_type is not RunType.RAND_FILL:
+            mem_filler = Runner(RunType.RAND_FILL, self.agent, self.env, None, self.nb_steps_ep_max, False)
+            mem_filler.run()
 
-        # !!!! Start by temp replacing the pol with a random one
-        agent.currently_used_policy = RandomPolicy()
+        # Now temp replace the pol if rand_fill or test
+        self.temp_replace_policy()
 
-        state_size = env.observation_space.shape[0]
-
+        state_size = self.env.observation_space.shape[0]
         current_ep_step = 0
-        state = env.reset()
+        current_total_step = 0
+        state = self.env.reset()
         state = np.reshape(state, [1, state_size])
 
-        while agent.memory.is_full is False:
-
-            action = agent.act(state)
-
-            next_state, reward, done, _ = env.step(action)
-            next_state = np.reshape(next_state, [1, state_size])
-
-            if done:
-                next_state = None
-
-            agent.remember(state, action, reward, next_state)
-
-            if done or current_ep_step == nb_steps_ep_max:
-                current_ep_step = 0
-                state = env.reset()
-                state = np.reshape(state, [1, state_size])
-
-            else:
-                state = next_state
-                current_ep_step += 1
-
-        # set policy back
-        agent.currently_used_policy = agent.policy
-
-    def run_train(self, agent, env, nb_steps, nb_steps_ep_max=None, visualize=False):
-        # Make sure current policy is = to policy
-        assert agent.currently_used_policy is agent.policy, "While training the current policy should be the init one"
-
-        # First use a random policy to fill the memory
-        assert agent.uses_replay is not None, "`uses_replay` is still `None`, need to set it."
-        if agent.uses_replay is True:
-            self.fill_memory(agent, env, nb_steps_ep_max)
-
-        state_size = env.observation_space.shape[0]
-
-        current_ep_step = 0
-        state = env.reset()
-        state = np.reshape(state, [1, state_size])
-
-        for step in range(nb_steps):
+        while self.check_loop(current_total_step):
 
             # Debug ----
-            if agent.uses_replay is True:
-                assert agent.memory.is_full(), "Replay agent's memory is NOT full while training."
+            if self.agent.uses_replay is True and self.run_type is RunType.TRAIN:
+                assert self.agent.memory.is_full(), "Replay agent's memory is NOT full while training."
             # ----------
 
-            action = agent.act(state)
+            action = self.agent.act(state)
 
-            if visualize:
-                env.render()
+            if self.visualize:
+                self.env.render()
 
-            next_state, reward, done, _ = env.step(action)
+            next_state, reward, done, _ = self.env.step(action)
             next_state = np.reshape(next_state, [1, state_size])
 
             if done:
                 next_state = None
 
-            agent.remember(state, action, reward, next_state)
+            self.remember(state, action, reward, next_state)
 
-            # CURRENTLY: the update_implicit_policy is in the update_params method
-            # if step % 500 == 0:
-            agent.update_params(step)
-            agent.update_implicit_policy(step)
+            self.update_models_and_policy(current_total_step)
 
-            # this one can update on any step probs
-            agent.check_update_target_model(step)
-
-            # If next_state is terminal or the current ep steps is equal to the number of steps max for an episode
-            # then reset, otherwise continue
-            if done or current_ep_step == nb_steps_ep_max:
+            if done or current_ep_step == self.nb_steps_ep_max:
 
                 # print(current_ep_step)
 
                 current_ep_step = 0
-                state = env.reset()
+                state = self.env.reset()
                 state = np.reshape(state, [1, state_size])
 
             else:
                 state = next_state
                 current_ep_step += 1
 
-    # Implement this
-    def run_test(self, agent, env, nb_episodes, nb_steps_ep_max=None, visualize=False):
-        agent.currently_used_policy = GreedyPolicy()
+            current_total_step += 1
+        # At very end reset the policy
+        self.reset_policy()
 
-        state_size = env.observation_space.shape[0]
+    def temp_replace_policy(self):
+        if self.run_type is RunType.RAND_FILL:
+            self.agent.currently_used_policy = RandomPolicy()
+        if self.run_type is RunType.TEST:
+            self.agent.currently_used_policy = GreedyPolicy()
 
-        for episode in nb_episodes:
-            state = env.reset()
-            state = np.reshape(state, [1, state_size])
+    def check_loop(self, current_total_step):
+        if self.run_type is RunType.RAND_FILL:
+            if self.agent.memory.is_full() is False:
+                return True
+            else:
+                return False
+        if self.run_type is RunType.TRAIN or self.run_type is RunType.TEST:
+            if current_total_step == self.nb_steps:
+                return False
+            else:
+                return True
 
-            current_ep_step = 0
+    def remember(self, state, action, reward, next_state):
+        if self.run_type is RunType.TEST:
+            return
+        self.agent.remember(state, action, reward, next_state)
 
-            while current_ep_step is not nb_steps_ep_max:
-                action = agent.act(state)
+    def update_models_and_policy(self, current_total_step):
+        if self.run_type is RunType.RAND_FILL or self.run_type is RunType.TEST:
+            return
+        # CURRENTLY: the update_implicit_policy is in the update_params method
+        # if step % 500 == 0:
+        self.agent.update_params(current_total_step)
+        self.agent.update_implicit_policy(current_total_step)
 
-                if visualize:
-                    env.render()
+        # this one can update on any step probs
+        self.agent.check_update_target_model(current_total_step)
 
-                next_state, reward, done, _ = env.step(action)
-                next_state = np.reshape(next_state, [1, state_size])
-
-                if done:
-                    next_state = None
-                    break
-
-                state = next_state
-                current_ep_step += 1
-
-        agent.currently_used_policy = agent.policy
+    def reset_policy(self):
+        self.agent.currently_used_policy = self.agent.policy
