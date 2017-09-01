@@ -1,6 +1,8 @@
 from runner import Runner
 from keras import models
 from enum import Enum
+from runner import RunType
+import numpy as np
 
 '''
 CURRENT WORK:
@@ -32,7 +34,7 @@ class TargetUpdateType(Enum):
 
 
 class Agent:
-    def __init__(self, model, optimizer, policy, gamma=0.95, target_model_update_policy=TargetUpdateType.HARD, target_model_hard_policy_wait=1000):
+    def __init__(self, model, optimizer, policy, gamma=0.95, target_model_update_policy=TargetUpdateType.HARD, target_model_hard_policy_wait=1000, target_model_soft_policy_constant=0.9):
         if target_model_hard_policy_wait < 1:
             raise ValueError('`target_model_hard_policy_wait` is < 1.')
         if gamma < 0 or gamma > 1:
@@ -45,6 +47,7 @@ class Agent:
         self.gamma = gamma
         self.target_model_update_policy = target_model_update_policy
         self.target_model_hard_policy_wait = target_model_hard_policy_wait
+        self.target_model_soft_policy_constant = target_model_soft_policy_constant
         # self.memory = Memory(max_memory_length) // Moved to agent specific
         self.uses_replay = None
 
@@ -64,15 +67,15 @@ class Agent:
         self.policy.update(step)
 
     def check_update_target_model(self, step):
-        if self.target_model_update_policy.name == TargetUpdateType.HARD and step % self.target_model_hard_policy_wait == 0:
-            self.tar_model.set_weights(self.beh_model.get_weights())
-        # elif self.target_model_update_policy.name == TargetUpdateType.SOFT:
-        #     IMPLEMENT THIS
+        if self.target_model_update_policy is TargetUpdateType.HARD:
+            if step % self.target_model_hard_policy_wait == 0:
+                self.tar_model.set_weights(self.beh_model.get_weights())
+        else:
+            tau = self.target_model_soft_policy_constant
+            self.tar_model.set_weights(tau * np.asarray(self.beh_model.get_weights()) + (1 - tau) * np.asarray(self.tar_model.get_weights()))
 
     def train(self, env, nb_steps, nb_steps_ep_max=None, visualize=False):
-        runner = Runner()
-        runner.run_train(self, env, nb_steps, nb_steps_ep_max, visualize)
+        Runner(RunType.TRAIN, self, env, nb_steps, nb_steps_ep_max, visualize).run()
 
-    def test(self, env, nb_episodes, nb_steps_ep_max=None, visualize=False):
-        runner = Runner()
-        runner.run_test(self, env, nb_episodes, nb_steps_ep_max, visualize)
+    def test(self, env, nb_steps, nb_steps_ep_max=None, visualize=False):
+        Runner(RunType.TEST, self, env, nb_steps, nb_steps_ep_max, visualize).run()

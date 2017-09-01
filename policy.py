@@ -62,7 +62,8 @@ class EpsilonGreedyPolicy(Policy):
 
 class RandomPolicy(Policy):
     def return_action(self, vals, mode):
-        return np.random.random_integers(0, vals - 1)  # doesnt matter if q or prob vals, its random
+        nb_actions = vals.shape[0]
+        return np.random.random_integers(0, nb_actions - 1)  # doesnt matter if q or prob vals, its random
 
     def update(self, step):
         pass

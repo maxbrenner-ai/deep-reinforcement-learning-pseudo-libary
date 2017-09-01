@@ -17,39 +17,7 @@ import numpy as np
 from policy import RandomPolicy, GreedyPolicy, ReturnActionType
 from enum import Enum
 
-'''
 
-
-
-
-
-
-
-
-
-
-
-
-Current Work: HERE IS HOW I AM GONNA DO IT:
-    - Every piece of code in the runner will have its own method and i will send a flag in which is
-    random_fill, train or test and add any ifs in each method 
-    - This way i can have ONE run method and i just send in the appropriate flag
-    - And cuz the structure is slightly dif (the loops) just do a while loop and have it call a method, once again
-    send in the flag
-
-
-
-
-
-
-
-
-
-
-
-
-
-'''
 class RunType(Enum):
     RAND_FILL = 1
     TRAIN = 2
@@ -67,6 +35,8 @@ class Runner:
         assert agent.uses_replay is not None, "`uses_replay` is still `None`, need to set it."
 
     def run(self):
+        self.print_flag()
+
         if self.run_type is RunType.TRAIN:
             assert self.agent.currently_used_policy is self.agent.policy, "While training the current policy should be the init one"
 
@@ -79,10 +49,9 @@ class Runner:
         self.temp_replace_policy()
 
         state_size = self.env.observation_space.shape[0]
-        current_ep_step = 0
         current_total_step = 0
-        state = self.env.reset()
-        state = np.reshape(state, [1, state_size])
+        current_episode = 1
+        current_ep_step, state = self.reset_eipsode(state_size)
 
         while self.check_loop(current_total_step):
 
@@ -103,17 +72,18 @@ class Runner:
                 next_state = None
 
             self.remember(state, action, reward, next_state)
+            # print(len(self.agent.memory.storage))
 
             self.update_models_and_policy(current_total_step)
 
             if done or current_ep_step == self.nb_steps_ep_max:
 
-                # print(current_ep_step)
+                print("Ep ", current_episode, " score: ", current_ep_step)
+                if self.run_type is RunType.TRAIN:
+                    print("Current Eps: ", self.agent.currently_used_policy.eps)
 
-                current_ep_step = 0
-                state = self.env.reset()
-                state = np.reshape(state, [1, state_size])
-
+                current_ep_step, state = self.reset_eipsode(state_size)
+                current_episode += 1
             else:
                 state = next_state
                 current_ep_step += 1
@@ -122,11 +92,22 @@ class Runner:
         # At very end reset the policy
         self.reset_policy()
 
+    def print_flag(self):
+        if self.run_type is RunType.RAND_FILL:
+            print("Randomly filling agent memory...")
+        elif self.run_type is RunType.TRAIN:
+            print("Training agent...")
+        elif self.run_type is RunType.TEST:
+            print("Testing agent...")
+
     def temp_replace_policy(self):
         if self.run_type is RunType.RAND_FILL:
             self.agent.currently_used_policy = RandomPolicy()
         if self.run_type is RunType.TEST:
             self.agent.currently_used_policy = GreedyPolicy()
+
+    def reset_eipsode(self, state_size):
+        return 0, np.reshape(self.env.reset(), [1, state_size])
 
     def check_loop(self, current_total_step):
         if self.run_type is RunType.RAND_FILL:
@@ -149,7 +130,7 @@ class Runner:
         if self.run_type is RunType.RAND_FILL or self.run_type is RunType.TEST:
             return
         # CURRENTLY: the update_implicit_policy is in the update_params method
-        # if step % 500 == 0:
+        # if current_total_step % 10 == 0:
         self.agent.update_params(current_total_step)
         self.agent.update_implicit_policy(current_total_step)
 
