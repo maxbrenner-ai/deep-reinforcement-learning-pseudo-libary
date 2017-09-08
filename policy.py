@@ -36,10 +36,14 @@ class EpsilonGreedyPolicy(Policy):
             raise ValueError("`min_epsilon` should not be less than 0 or greater than 1")
         if decay < 0 or decay > 1.0:
             raise ValueError("`decay` should not be less than 0 or greater than 1")
+        self.cb = None
         self.eps = init_eps
         self.MAX_EPS = init_eps
         self.MIN_EPS = min_epsilon
         self.DECAY = decay
+
+    def set_cb(self, cb):
+        self.cb = cb
 
     # This works for both q_vals and probs cuz either way a vector of vals that matches the length of the num of
     # actions should be sent in
@@ -57,7 +61,8 @@ class EpsilonGreedyPolicy(Policy):
 
     def update(self, step):
         self.eps = self.MIN_EPS + (self.MAX_EPS - self.MIN_EPS) * exp(-self.DECAY * step)
-        # print("Eps:", self.eps)
+        if self.cb is not None:
+            self.cb.update(self.eps)
 
 
 class RandomPolicy(Policy):

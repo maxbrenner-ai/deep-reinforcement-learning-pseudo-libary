@@ -12,46 +12,64 @@ count against the agent
 
 - SOMETHING TO CONSIDER: instead of making a runner instance every call to train or test, maybe just make one in the
 init of the agent????
+
+- IMPORTANT: the instance var run_type is CONSTANT, it never changes and should never change from its initial state in
+the runner
+- IMPORTANT: Make sure i dont send any callbacks when rand filling
+- IMPORTANT: Make sure i do auto replace the policy of the agent when testing with greedy, cuz its right but also because
+if i dont, then the runner will use the same instance of the policy (eps greedy) and the eps will be phucked up and
+a cb might still be in there
 '''
 import numpy as np
-from policy import RandomPolicy, GreedyPolicy, ReturnActionType
-from enum import Enum
+from policy import RandomPolicy, GreedyPolicy
+from callbacks import PrintCallbacksManager
+from utils import RunType
 
-
-class RunType(Enum):
-    RAND_FILL = 1
-    TRAIN = 2
-    TEST = 3
 
 class Runner:
-    def __init__(self, run_type, agent, env, nb_steps=None, nb_steps_ep_max=None, visualize=False):
+    def __init__(self, run_type, agent, env, nb_steps, nb_steps_ep_max=None, print_rew_cb=None, print_eps_cb=None, visualize=False, allow_printing=True):
         self.run_type = run_type
         self.agent = agent
         self.env = env
         self.nb_steps = nb_steps
         self.nb_steps_ep_max = nb_steps_ep_max
         self.visualize = visualize
+        self.allow_printing = allow_printing
+
+        # Make a callbacksmanager
+        callbacks = []
+        if print_rew_cb is not None:
+            callbacks.append(print_rew_cb)
+        if print_eps_cb is not None:
+            callbacks.append(print_eps_cb)
+        self.cbmanager = PrintCallbacksManager(callbacks, self.run_type)
+        self.print_rew_cb = print_rew_cb
 
         assert agent.uses_replay is not None, "`uses_replay` is still `None`, need to set it."
 
     def run(self):
-        self.print_flag()
-
         if self.run_type is RunType.TRAIN:
             assert self.agent.currently_used_policy is self.agent.policy, "While training the current policy should be the init one"
 
         # If it needs to fill the mem and its not already doing that then fill it
-        if self.agent.uses_replay is True and self.run_type is not RunType.RAND_FILL:
-            mem_filler = Runner(RunType.RAND_FILL, self.agent, self.env, None, self.nb_steps_ep_max, False)
+        if self.agent.uses_replay is True and self.run_type is RunType.TRAIN:
+            self.cbmanager.set_run_type_of_cbs(RunType.RAND_FILL)
+            mem_filler = Runner(RunType.RAND_FILL, self.agent, self.env, None, self.nb_steps_ep_max, None, None, False, self.allow_printing)
             mem_filler.run()
+            self.cbmanager.set_run_type_of_cbs(self.run_type)
+
+        self.print_flag()
 
         # Now temp replace the pol if rand_fill or test
         self.temp_replace_policy()
 
         state_size = self.env.observation_space.shape[0]
         current_total_step = 0
-        current_episode = 1
+        current_episode = 1  # MUST START AT 1
         current_ep_step, state = self.reset_eipsode(state_size)
+
+        if self.allow_printing and self.run_type is not RunType.RAND_FILL:
+            print("Episode", current_episode, "...")
 
         while self.check_loop(current_total_step):
 
@@ -66,6 +84,9 @@ class Runner:
                 self.env.render()
 
             next_state, reward, done, _ = self.env.step(action)
+            if self.print_rew_cb is not None:
+                self.print_rew_cb.update(reward)
+
             next_state = np.reshape(next_state, [1, state_size])
 
             if done:
@@ -77,28 +98,39 @@ class Runner:
             self.update_models_and_policy(current_total_step)
 
             if done or current_ep_step == self.nb_steps_ep_max:
-
-                print("Ep ", current_episode, " score: ", current_ep_step)
-                if self.run_type is RunType.TRAIN:
-                    print("Current Eps: ", self.agent.currently_used_policy.eps)
-
+                # End of episode
+                self.cbmanager.access_callbacks(self.allow_printing, end_of_episode=True, episode=current_episode)
                 current_ep_step, state = self.reset_eipsode(state_size)
                 current_episode += 1
+
+                if self.allow_printing and self.run_type is not RunType.RAND_FILL:
+                    print("Episode", current_episode, "...")
             else:
                 state = next_state
                 current_ep_step += 1
 
+            # End of step
+            self.cbmanager.access_callbacks(self.allow_printing, end_of_step=True, step=current_total_step)
             current_total_step += 1
+
+        # End of run
+        self.cbmanager.access_callbacks(self.allow_printing, end_of_run=True)
+
+        if self.allow_printing:
+            print("...Done")
         # At very end reset the policy
         self.reset_policy()
+        # Refresh cbs in case they are used again
+        self.cbmanager.refresh_cbs()
 
     def print_flag(self):
-        if self.run_type is RunType.RAND_FILL:
-            print("Randomly filling agent memory...")
-        elif self.run_type is RunType.TRAIN:
-            print("Training agent...")
-        elif self.run_type is RunType.TEST:
-            print("Testing agent...")
+        if self.allow_printing:
+            if self.run_type is RunType.RAND_FILL:
+                print("Randomly filling agent memory...")
+            elif self.run_type is RunType.TRAIN:
+                print("Training agent...")
+            elif self.run_type is RunType.TEST:
+                print("Testing agent...")
 
     def temp_replace_policy(self):
         if self.run_type is RunType.RAND_FILL:
