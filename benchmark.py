@@ -4,12 +4,6 @@ each episode, the avg reward per episode and the total reward for the test run
 
 Things to maybe add:
 - Allow multiple tests on one benchmark file for an agent
-- Try doing a kind of erase thing where i keep a certain lines (like the static info) and rewrite the file with these 
-lines an the new table while its updating, instead of rewriting the whole thing every time, since all that changes
-is the episode rew table
-- Also might wanna store all the writing stuff (except for the table) at once in a single string and then call f.write
-once instead of every time for a variable, it might be faster idk
-
 - Once i do some more work with the agents, like add dueling DQN revisit the model summary output and figure that out
 '''
 from prettytable import PrettyTable as table

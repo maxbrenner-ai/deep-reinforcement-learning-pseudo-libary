@@ -209,6 +209,7 @@ class Runner:
             self.agent.training_sess_nb_steps_ep_max if self.agent.training_sess_nb_steps_ep_max is not None else 'No Limit')
 
         text += "Test Run Data:\n"
+        text += 'Environment: {}\n'.format(self.env.name)
         text += "Total number of steps tested: {}\n".format((current_step + 1) if end_of_run is False else current_step)
         text += "Max number of steps allowed per episode: {}\n".format(
             self.nb_steps_ep_max if self.nb_steps_ep_max is not None else 'No Limit')
