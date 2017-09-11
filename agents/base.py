@@ -1,6 +1,6 @@
 from runner import Runner
 from keras import models
-from utils import RunType
+from util import RunType
 import numpy as np
 
 '''
@@ -22,8 +22,8 @@ Notes:
 - rn the memory stuff is in the base agent class but i might wanna make it per alg
 - im pretty sure i only need to compile the beh model cuz the tar model only ever uses predict aka its params are never optimized
 
-- REMEMBER: to set uses_replay to false or true in each specific agent init
-- IMPORTANT: remember not to measure any metrics in these, only in runner, cuz of random memory fill
+- REMEMBER: to set uses_replay to false or true in each specific agent init, ALSO set agent_type, Make sure all agents call and add to summary()
+- IMPORTANT: remember not to measure any metrics in these, only in callbacks, cuz of random memory fill
 '''
 from policy import EpsilonGreedyPolicy
 
@@ -47,6 +47,11 @@ class Agent:
         self.target_model_soft_policy_constant = target_model_soft_policy_constant
         # self.memory = Memory(max_memory_length) // Moved to agent specific
         self.uses_replay = None
+
+        # Extra benchmarking info:
+        self.agent_type = None
+        self.number_of_trained_steps = 0  # Total number of steps this agent has ever been trained for
+        self.training_sess_nb_steps_ep_max = None  # This is what the ep run ceiling was set to while training
 
     # Abstract method
     def act(self, state):
@@ -75,8 +80,24 @@ class Agent:
         if type(self.policy) is EpsilonGreedyPolicy and print_eps_cb is not None:
             self.policy.set_cb(print_eps_cb)
         self.currently_used_policy = self.policy
-        Runner(RunType.TRAIN, self, env, nb_steps, nb_steps_ep_max, print_rew_cb, print_eps_cb, visualize, allow_printing).run()
+        Runner(RunType.TRAIN, self, env, nb_steps, nb_steps_ep_max, print_rew_cb, print_eps_cb, None, visualize, allow_printing).run()
 
-    def test(self, env, nb_steps, nb_steps_ep_max=None, print_rew_cb=None, visualize=False, allow_printing=True):
+    # If they want benchmarking send in the file_name otherwise send in None (def.)
+    def test(self, env, nb_steps, nb_steps_ep_max=None, print_rew_cb=None, benchmark_file_name=None, visualize=False, allow_printing=True):
         # The policy auto switches to greedy when testing so no epsilon cb even allowed
-        Runner(RunType.TEST, self, env, nb_steps, nb_steps_ep_max, print_rew_cb, None, visualize, allow_printing).run()
+        Runner(RunType.TEST, self, env, nb_steps, nb_steps_ep_max, print_rew_cb, None, benchmark_file_name, visualize, allow_printing).run()
+
+    def summary(self):
+        text = "Agent Details:\n"
+        assert self.agent_type is not None, 'Need to set `agent_type`'
+        text += "Agent type: {}\n".format(self.agent_type.value)
+        text += "Model details: MODEL SUMMARIZER NOT IMPLEMENTED YET\n"
+        # agent.beh_model.summary(print_fn=lambda x: f.write(x + '\n'))
+        text += "Policy: {}\n".format(self.policy.summary())
+        text += "Gamma: {}\n".format(self.gamma)
+        text += "Target model update type: {}\n".format(self.target_model_update_policy.title())
+        if self.target_model_update_policy is 'hard':
+            text += "Target model update wait: {}\n".format(self.target_model_hard_policy_wait)
+        else:
+            text += "Target model update constant: {}\n".format(self.target_model_soft_policy_constant)
+        return text

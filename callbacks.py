@@ -11,15 +11,21 @@ List of Callbacks:
     
 NOTES:
 IMPORTANT: Disable all PrintCallback functions from being called or doing anything if run_type is RAND_FILL
-- I still need that check cuz even tho i make a new instance of runner for randfill and send in no cbs, the policy
-has a cb possibly and it wont know what the run type is
 - Duplicates are not allowed and have been fixed
 
 - Unfortunately when i make a new callback i will have to send its reference directly to where it needs to go, and
 call update directly
+
+- If a callback has multiple args for when do print or do something, allow multiple combos of those things, except i 
+guess if a special case arises
+
+- For now the save model callback is obviously just for the model and it used the keras save function, the load util
+ does too, so when i add extra graph and model stuff when i get to the dueling dqn and the other algs i will need
+ to see how to make it work (save the optimizer state and save the extra bit of model)
 '''
 
-from utils import RunType
+from util import RunType
+import keras
 
 # Manager class for managing the signals (flags) and printing or updating the print calbacks based off of the flgas
 class PrintCallbacksManager:
@@ -59,7 +65,7 @@ class PrintCallbacksManager:
 
 
 # Abstract class
-class PrintCallback:
+class Callback:
     def __init__(self):
         self.current_run_type = None
 
@@ -68,15 +74,25 @@ class PrintCallback:
     def refresh(self):
         raise NotImplementedError
 
-    # Observer update method
-    def update(self, value):
+    def update_on_flag(self, end_of_step, step, end_of_episode, episode, end_of_run):
         raise NotImplementedError
 
     def print(self, end_of_step, step, end_of_episode, episode, end_of_run):
         raise NotImplementedError
 
-    # For updating something based on end of episode or step or run
+# Abstract class
+class PrintCallback(Callback):
+    def __init__(self):
+        super().__init__()
+
+    def refresh(self):
+        raise NotImplementedError
+
     def update_on_flag(self, end_of_step, step, end_of_episode, episode, end_of_run):
+        raise NotImplementedError
+
+    # Observer update method
+    def update(self, value):
         raise NotImplementedError
 
 
@@ -100,11 +116,11 @@ class PrintReward(PrintCallback):
 
     def print(self, end_of_step, step, end_of_episode, episode, end_of_run):
         if end_of_episode:
-            print("Total Episode Reward:", self.total_ep_reward)
+            print("Total Episode Reward: {}".format(self.total_ep_reward))
         if end_of_run:
             # Know that the avg will not be equal to the total/num of ep in the end cuz it will prolly end in the middle of the last episode
-            print("Total Run Reward:", self.total_reward)
-            print("Avg Episode Reward:", self.current_avg)
+            print("Total Run Reward: {}".format(self.total_reward))
+            print("Avg Episode Reward: {}".format(self.current_avg))
 
     def update_on_flag(self, end_of_step, step, end_of_episode, episode, end_of_run):
         if end_of_episode:
@@ -136,10 +152,49 @@ class PrintEpsilon(PrintCallback):
         if self.iterations is not None:
             if end_of_step and (step+1) % self.iterations == 0:
                 assert self.epsilon is not None
-                print("Epsilon:", self.epsilon)
+                print("Epsilon: {}".format(self.epsilon))
         if end_of_episode and self.episodic:
             assert self.epsilon is not None
-            print("Epsilon:", self.epsilon)
+            print("Epsilon: {}".format(self.epsilon))
 
     def update_on_flag(self, end_of_step, step, end_of_episode, episode, end_of_run):
         pass
+
+
+# class VisualizeReward(Callback):
+
+
+'''
+
+FOR THIS TO WORK, will need to find how to send in model ONLY when its time to update cuz its too large of an object
+to continually update every time its changed. It actually might work to have a ref of it in the callback idk if thats
+a good idea either tho
+
+'''
+# class SaveModel(Callback):
+#     def __init__(self, file_path, episodic=True, iterations=None, at_end=True):
+#         super().__init__()
+#         self.file_path = file_path
+#         self.episodic = episodic
+#         self.iterations = iterations
+#         self.at_end = at_end
+#         self.model = None
+#
+#     def update_model(self, model):
+#         assert self.current_run_type is not None
+#         assert model is not None
+#         if self.current_run_type is RunType.RAND_FILL:
+#             return
+#         self.model = model
+#
+#     def update_on_flag(self, end_of_step, step, end_of_episode, episode, end_of_run):
+#         if self.iterations is not None:
+#             if end_of_step and (step + 1) % self.iterations == 0:
+#                 assert self.model is not None
+#                 keras.models.save_model(self.model, filepath=self.file_path)
+#         if self.episodic and end_of_episode:
+#             assert self.model is not None
+#             keras.models.save_model(self.model, filepath=self.file_path)
+#         if end_of_run and self.at_end:
+#             assert self.model is not None
+#             keras.models.save_model(self.model, filepath=self.file_path)

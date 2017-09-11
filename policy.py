@@ -27,6 +27,8 @@ class Policy:
     def update(self, step):
         raise NotImplementedError()
 
+    def summary(self):
+        raise NotImplementedError()
 
 class EpsilonGreedyPolicy(Policy):
     def __init__(self, init_eps=1.0, min_epsilon=0.01, decay=0.001):
@@ -64,6 +66,8 @@ class EpsilonGreedyPolicy(Policy):
         if self.cb is not None:
             self.cb.update(self.eps)
 
+    def summary(self):
+        return 'Epsilon Greedy\nInitial Epsilon: {}\nEpsilon Lower Bound: {}\nEpsilon Decay Rate: {}'.format(self.MAX_EPS, self.MIN_EPS, self.DECAY)
 
 class RandomPolicy(Policy):
     def return_action(self, vals, mode):
@@ -73,6 +77,8 @@ class RandomPolicy(Policy):
     def update(self, step):
         pass
 
+    def summary(self):
+        return 'Random\n'
 
 class GreedyPolicy(Policy):
     def return_action(self, vals, mode):
@@ -81,3 +87,6 @@ class GreedyPolicy(Policy):
 
     def update(self, step):
         pass
+
+    def summary(self):
+        return 'Greedy\n'

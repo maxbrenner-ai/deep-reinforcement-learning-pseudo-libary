@@ -19,15 +19,19 @@ the runner
 - IMPORTANT: Make sure i do auto replace the policy of the agent when testing with greedy, cuz its right but also because
 if i dont, then the runner will use the same instance of the policy (eps greedy) and the eps will be phucked up and
 a cb might still be in there
+
+- Currently i dont allow adding transitions to memory if in testing mode, might change that tho idk
+- Make sure not to run rand_fill while testing! only training if necessary
 '''
 import numpy as np
 from policy import RandomPolicy, GreedyPolicy
 from callbacks import PrintCallbacksManager
-from utils import RunType
+from util import RunType
+from benchmark import Benchmark
 
 
 class Runner:
-    def __init__(self, run_type, agent, env, nb_steps, nb_steps_ep_max=None, print_rew_cb=None, print_eps_cb=None, visualize=False, allow_printing=True):
+    def __init__(self, run_type, agent, env, nb_steps, nb_steps_ep_max=None, print_rew_cb=None, print_eps_cb=None, benchmark_file_name=None, visualize=False, allow_printing=True):
         self.run_type = run_type
         self.agent = agent
         self.env = env
@@ -36,14 +40,28 @@ class Runner:
         self.visualize = visualize
         self.allow_printing = allow_printing
 
+        # Set training benchmark info
+        if run_type is RunType.TRAIN:
+            agent.training_sess_nb_steps_ep_max = nb_steps_ep_max
+
+        # Make benchmarking object
+        # It will be none if wasnt sent in but still testing or if training/rand_fill which is good
+        if benchmark_file_name is not None:
+            self.benchmark = Benchmark(benchmark_file_name)
+        else:
+            self.benchmark = None
+
         # Make a callbacksmanager
         callbacks = []
+        # if save_model_cb is not None:
+        #     callbacks.append(save_model_cb)
         if print_rew_cb is not None:
             callbacks.append(print_rew_cb)
         if print_eps_cb is not None:
             callbacks.append(print_eps_cb)
         self.cbmanager = PrintCallbacksManager(callbacks, self.run_type)
         self.print_rew_cb = print_rew_cb
+        # self.save_model_cb = save_model_cb
 
         assert agent.uses_replay is not None, "`uses_replay` is still `None`, need to set it."
 
@@ -54,7 +72,7 @@ class Runner:
         # If it needs to fill the mem and its not already doing that then fill it
         if self.agent.uses_replay is True and self.run_type is RunType.TRAIN:
             self.cbmanager.set_run_type_of_cbs(RunType.RAND_FILL)
-            mem_filler = Runner(RunType.RAND_FILL, self.agent, self.env, None, self.nb_steps_ep_max, None, None, False, self.allow_printing)
+            mem_filler = Runner(RunType.RAND_FILL, self.agent, self.env, None, self.nb_steps_ep_max, None, None, None, False, self.allow_printing)
             mem_filler.run()
             self.cbmanager.set_run_type_of_cbs(self.run_type)
 
@@ -69,7 +87,7 @@ class Runner:
         current_ep_step, state = self.reset_eipsode(state_size)
 
         if self.allow_printing and self.run_type is not RunType.RAND_FILL:
-            print("Episode", current_episode, "...")
+            print("Episode {}...".format(current_episode))
 
         while self.check_loop(current_total_step):
 
@@ -86,25 +104,31 @@ class Runner:
             next_state, reward, done, _ = self.env.step(action)
             if self.print_rew_cb is not None:
                 self.print_rew_cb.update(reward)
+            if self.benchmark is not None:
+                self.benchmark.update(reward)
 
             next_state = np.reshape(next_state, [1, state_size])
 
             if done:
                 next_state = None
 
-            self.remember(state, action, reward, next_state)
-            # print(len(self.agent.memory.storage))
+            if self.run_type is not RunType.TEST:
+                self.remember(state, action, reward, next_state)
 
             self.update_models_and_policy(current_total_step)
 
             if done or current_ep_step == self.nb_steps_ep_max:
                 # End of episode
                 self.cbmanager.access_callbacks(self.allow_printing, end_of_episode=True, episode=current_episode)
+                if self.benchmark is not None:
+                    self.benchmark.update_end_of_ep(current_episode)
+                    self.benchmark.output_to_file(False, current_episode, agent_summary=self.agent.summary(),
+                                                  runner_summary=self.summary(False, current_total_step))
                 current_ep_step, state = self.reset_eipsode(state_size)
                 current_episode += 1
 
                 if self.allow_printing and self.run_type is not RunType.RAND_FILL:
-                    print("Episode", current_episode, "...")
+                    print("Episode {}...".format(current_episode))
             else:
                 state = next_state
                 current_ep_step += 1
@@ -115,6 +139,11 @@ class Runner:
 
         # End of run
         self.cbmanager.access_callbacks(self.allow_printing, end_of_run=True)
+        if self.benchmark is not None:
+            self.benchmark.output_to_file(True, -1, agent_summary=self.agent.summary(), runner_summary=self.summary(True, current_total_step))
+        # Set training benchmark info
+        if self.run_type is RunType.TRAIN:
+            self.agent.number_of_trained_steps = current_total_step
 
         if self.allow_printing:
             print("...Done")
@@ -171,3 +200,17 @@ class Runner:
 
     def reset_policy(self):
         self.agent.currently_used_policy = self.agent.policy
+
+    def summary(self, end_of_run, current_step):
+        text = ''
+        text += "Train Run Info:\n"
+        text += "Total number of steps trained: {}\n".format(self.agent.number_of_trained_steps)
+        text += "Max number of steps allowed per episode: {}\n\n".format(
+            self.agent.training_sess_nb_steps_ep_max if self.agent.training_sess_nb_steps_ep_max is not None else 'No Limit')
+
+        text += "Test Run Data:\n"
+        text += "Total number of steps tested: {}\n".format((current_step + 1) if end_of_run is False else current_step)
+        text += "Max number of steps allowed per episode: {}\n".format(
+            self.nb_steps_ep_max if self.nb_steps_ep_max is not None else 'No Limit')
+
+        return text

@@ -9,7 +9,7 @@ from policy import ReturnActionType
 import random
 import numpy as np
 from memory import Memory
-
+from util import AgentType
 
 class DQN(Agent):
     def __init__(self, double_dqn=True, batch_size=32, max_memory_length=1000, *args, **kwargs):
@@ -24,6 +24,8 @@ class DQN(Agent):
         # Pretty sure dont need to compile the target model
         self.beh_model.compile(loss='mse', optimizer=self.optimizer)
         self.uses_replay = True
+
+        self.agent_type = AgentType.DQN
 
     def act(self, state): #s.reshape(1, self.stateCnt)
         output = self.beh_model.predict(state)[0]  # assumes all models only use state as input
@@ -47,3 +49,9 @@ class DQN(Agent):
             self.beh_model.train_on_batch(state, target_f)
             # self.beh_model.fit(state, target_f, batch_size=self.batch_size, epochs=1, verbose=0)
 
+    def summary(self):
+        text = super().summary()
+        text += 'Double option used: {}\n'.format(self.double_dqn)
+        text += 'Memory replay batch size: {}\n'.format(self.batch_size)
+        text += 'Memory length: {}\n'.format(self.memory.storage.maxlen)
+        return text
