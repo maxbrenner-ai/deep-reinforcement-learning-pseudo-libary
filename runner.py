@@ -9,17 +9,14 @@ Notes:
 - I think that for agents that use memory/replay a random policy should be used to fill the memory and this should not
 count against the agent
 - Currently the policy only updates when the params update
-
 - SOMETHING TO CONSIDER: instead of making a runner instance every call to train or test, maybe just make one in the
 init of the agent????
-
 - IMPORTANT: the instance var run_type is CONSTANT, it never changes and should never change from its initial state in
 the runner
 - IMPORTANT: Make sure i dont send any callbacks when rand filling
 - IMPORTANT: Make sure i do auto replace the policy of the agent when testing with greedy, cuz its right but also because
 if i dont, then the runner will use the same instance of the policy (eps greedy) and the eps will be phucked up and
 a cb might still be in there
-
 - Currently i dont allow adding transitions to memory if in testing mode, might change that tho idk
 - Make sure not to run rand_fill while testing! only training if necessary
 '''
@@ -27,29 +24,15 @@ import numpy as np
 from policy import RandomPolicy, GreedyPolicy
 from callbacks import PrintCallbacksManager
 from util import RunType
-from benchmark import Benchmark
 
 
 class Runner:
-    def __init__(self, run_type, agent, env, nb_steps, nb_steps_ep_max=None, print_rew_cb=None, print_eps_cb=None, benchmark_file_name=None, visualize=False, allow_printing=True):
+    def __init__(self, run_type, agent, env, nb_steps, nb_steps_ep_max=None, print_rew_cb=None, print_eps_cb=None, benchmark=None, visualize=False, allow_printing=True):
         self.run_type = run_type
         self.agent = agent
         self.env = env
         self.nb_steps = nb_steps
         self.nb_steps_ep_max = nb_steps_ep_max
-        self.visualize = visualize
-        self.allow_printing = allow_printing
-
-        # Set training benchmark info
-        if run_type is RunType.TRAIN:
-            agent.training_sess_nb_steps_ep_max = nb_steps_ep_max
-
-        # Make benchmarking object
-        # It will be none if wasnt sent in but still testing or if training/rand_fill which is good
-        if benchmark_file_name is not None:
-            self.benchmark = Benchmark(benchmark_file_name)
-        else:
-            self.benchmark = None
 
         # Make a callbacksmanager
         callbacks = []
@@ -62,6 +45,14 @@ class Runner:
         self.cbmanager = PrintCallbacksManager(callbacks, self.run_type)
         self.print_rew_cb = print_rew_cb
         # self.save_model_cb = save_model_cb
+
+        self.benchmark = benchmark
+        self.visualize = visualize
+        self.allow_printing = allow_printing
+
+        # Set training benchmark info
+        if run_type is RunType.TRAIN:
+            agent.training_sess_nb_steps_ep_max = nb_steps_ep_max
 
         assert agent.uses_replay is not None, "`uses_replay` is still `None`, need to set it."
 
@@ -102,6 +93,9 @@ class Runner:
                 self.env.render()
 
             next_state, reward, done, _ = self.env.step(action)
+            # Clips reward to [-1.0, 1.0] if clipping is on for the agent
+            if self.agent.reward_clipping is True:
+                reward = np.clip(reward, -1.0, 1.0)
             if self.print_rew_cb is not None:
                 self.print_rew_cb.update(reward)
             if self.benchmark is not None:
@@ -209,7 +203,7 @@ class Runner:
             self.agent.training_sess_nb_steps_ep_max if self.agent.training_sess_nb_steps_ep_max is not None else 'No Limit')
 
         text += "Test Run Data:\n"
-        text += 'Environment: {}\n'.format(self.env.name)
+        text += 'Environment: {}\n'.format(self.env)
         text += "Total number of steps tested: {}\n".format((current_step + 1) if end_of_run is False else current_step)
         text += "Max number of steps allowed per episode: {}\n".format(
             self.nb_steps_ep_max if self.nb_steps_ep_max is not None else 'No Limit')

@@ -24,12 +24,14 @@ Notes:
 
 - REMEMBER: to set uses_replay to false or true in each specific agent init, ALSO set agent_type, Make sure all agents call and add to summary()
 - IMPORTANT: remember not to measure any metrics in these, only in callbacks, cuz of random memory fill
+
+- Not sure if reward clipping should be an arg for the agent or the train/test run
 '''
 from policy import EpsilonGreedyPolicy
 
 
 class Agent:
-    def __init__(self, model, optimizer, policy, gamma=0.95, target_model_update_policy='hard', target_model_hard_policy_wait=1000, target_model_soft_policy_constant=0.9):
+    def __init__(self, model, optimizer, policy, gamma=0.95, target_model_update_policy='hard', target_model_hard_policy_wait=1000, target_model_soft_policy_constant=0.9, frame_skip=0, reward_clipping=False):
         if target_model_hard_policy_wait < 1:
             raise ValueError('`target_model_hard_policy_wait` is < 1.')
         if gamma < 0 or gamma > 1:
@@ -45,7 +47,9 @@ class Agent:
         self.target_model_update_policy = target_model_update_policy
         self.target_model_hard_policy_wait = target_model_hard_policy_wait
         self.target_model_soft_policy_constant = target_model_soft_policy_constant
-        # self.memory = Memory(max_memory_length) // Moved to agent specific
+        self.frame_skip = frame_skip
+        self.reward_clipping = reward_clipping
+
         self.uses_replay = None
 
         # Extra benchmarking info:
@@ -83,9 +87,9 @@ class Agent:
         Runner(RunType.TRAIN, self, env, nb_steps, nb_steps_ep_max, print_rew_cb, print_eps_cb, None, visualize, allow_printing).run()
 
     # If they want benchmarking send in the file_name otherwise send in None (def.)
-    def test(self, env, nb_steps, nb_steps_ep_max=None, print_rew_cb=None, benchmark_file_name=None, visualize=False, allow_printing=True):
+    def test(self, env, nb_steps, nb_steps_ep_max=None, print_rew_cb=None, benchmark=None, visualize=False, allow_printing=True):
         # The policy auto switches to greedy when testing so no epsilon cb even allowed
-        Runner(RunType.TEST, self, env, nb_steps, nb_steps_ep_max, print_rew_cb, None, benchmark_file_name, visualize, allow_printing).run()
+        Runner(RunType.TEST, self, env, nb_steps, nb_steps_ep_max, print_rew_cb, None, benchmark, visualize, allow_printing).run()
 
     def summary(self):
         text = "Agent Details:\n"
