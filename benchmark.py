@@ -2,21 +2,24 @@
 This class is for saving the details of an agent in a readable format to an external file, along with the rewards for
 each episode, the avg reward per episode and the total reward for the test run
 
+Notes:
+- Can save to file every some odd episodes instead of just very end so that if testing is ended early for some reason
+ some benchmarking data will still be saved
+
 Things to maybe add:
 - Allow multiple tests on one benchmark file for an agent
 - Once i do some more work with the agents, like add dueling DQN revisit the model summary output and figure that out
 '''
-from prettytable import PrettyTable as table
-from util import AgentType
+from prettytable import PrettyTable as Table
 
 
 class Benchmark:
+    # episode_iteration can be 0 as to say not to output until very end
     def __init__(self, file_path, episode_iteration=1):
-        if episode_iteration < 1:
+        if episode_iteration < 0:
             raise ValueError("`episode_iteration` should not be less than 1")
         self.file_path = file_path
         self.episode_iteration = episode_iteration
-
         self.episode_reward_logs = []
         self.total_reward = 0
         self.total_ep_reward = 0
@@ -32,9 +35,11 @@ class Benchmark:
         self.episode_reward_logs.append([episode, self.total_ep_reward])
         self.total_ep_reward = 0
 
-    def output_to_file(self, end_of_run, epsiode, agent_summary, runner_summary):
-        if epsiode % self.episode_iteration == 0 or end_of_run:
-            t = table(['Episode', 'Total Episode Reward'])
+    def output_to_file(self, end_of_run, episode, agent_summary, runner_summary):
+        if not end_of_run and self.episode_iteration == 0:
+            return
+        if end_of_run or episode % self.episode_iteration == 0:
+            t = Table(['Episode', 'Total Episode Reward'])
             for row in self.episode_reward_logs:
                 t.add_row(row)
 
