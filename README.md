@@ -15,14 +15,14 @@ python examples/dqn_cartpole.py
 ```
 
 ## Algorithms Currently Implemented:
-- DQN] [[1](https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf)]
+- DQN [[1](https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf)]
 - Double DQN [[2](https://arxiv.org/abs/1509.06461)]
 
 ## Algorithms to add next:
 - Dueling DQN [[3](https://arxiv.org/abs/1511.06581)]
 - DDPG [[4](https://arxiv.org/pdf/1509.02971)]
 - A3C [[5](https://arxiv.org/abs/1602.01783)]
-- TRPO   [[6](https://arxiv.org/abs/1502.05477)]
+- TRPO [[6](https://arxiv.org/abs/1502.05477)]
 
 ## References
 1. Playing Atari with Deep Reinforcement Learning, Mnih et al., 2013
