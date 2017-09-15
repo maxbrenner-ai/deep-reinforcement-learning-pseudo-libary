@@ -9,14 +9,25 @@ This is an in-development sort-of-library for Reinforcement Learning. It is simi
 - Tensorflow >= 1.21 (GPU access for faster training)
 
 ## How to use:
-- Look at example.py for usage case
+You can run and look at this example:
+```
+python examples/dqn_cartpole.py
+```
 
 ## Algorithms Currently Implemented:
-- DQN (https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf)
-  - Double functionality (https://arxiv.org/abs/1509.06461)
+- DQN [1](https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf)
+- Double functionality [2](https://arxiv.org/abs/1509.06461)
 
-## Algorithms To add:
-- Completed dueling functionality for DQN (https://arxiv.org/abs/1511.06581)
-- DDPG (https://arxiv.org/pdf/1509.02971)
-- A3C (https://arxiv.org/abs/1602.01783)
-- TRPO (https://arxiv.org/abs/1502.05477)
+## Algorithms to add next:
+- Completed dueling functionality for DQN [3](https://arxiv.org/abs/1511.06581)
+- DDPG [4](https://arxiv.org/pdf/1509.02971) 
+- A3C [5](https://arxiv.org/abs/1602.01783) 
+- TRPO [6](https://arxiv.org/abs/1502.05477) 
+
+## References
+1. Playing Atari with Deep Reinforcement Learning, Mnih et al., 2013
+2. Deep Reinforcement Learning with Double Q-Learning, Hasselt et al., 2015
+3. Dueling Network Architectures for Deep Reinforcement Learning, Wang et al., 2015
+4. Continuous Control with Deep Reinforcement Learning, Lillicrap et al., 2016
+5. Asynchronous Methods for Deep Reinforcement Learning, Mnih et al., 2016
+6. Trust Region Policy Optimization, Schulman et al., 2015
