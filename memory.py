@@ -1,14 +1,3 @@
-'''
-Outline:
-- Deque is the object type
-- variables:
-    - max_length
-- methods:
-    - append, sample, refresh
-    
-Notes:
-- make sure the is_full method works
-'''
 from collections import deque
 import random
 

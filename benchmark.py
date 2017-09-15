@@ -1,15 +1,3 @@
-'''
-This class is for saving the details of an agent in a readable format to an external file, along with the rewards for
-each episode, the avg reward per episode and the total reward for the test run
-
-Notes:
-- Can save to file every some odd episodes instead of just very end so that if testing is ended early for some reason
- some benchmarking data will still be saved
-
-Things to maybe add:
-- Allow multiple tests on one benchmark file for an agent
-- Once i do some more work with the agents, like add dueling DQN revisit the model summary output and figure that out
-'''
 from prettytable import PrettyTable as Table
 
 

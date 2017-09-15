@@ -1,31 +1,5 @@
-'''
-Outline:
-- list of callbacks
-- not sure about this one and in comparison to metrics and benchmarks
-
-List of Callbacks:
-- Print reward: total after every episode, total and avg per episode at end 
-
-- Print epsilon
-    - Every step or every ep, or every some number of iterations
-    
-NOTES:
-IMPORTANT: Disable all PrintCallback functions from being called or doing anything if run_type is RAND_FILL
-- Duplicates are not allowed and have been fixed
-
-- Unfortunately when i make a new callback i will have to send its reference directly to where it needs to go, and
-call update directly
-
-- If a callback has multiple args for when do print or do something, allow multiple combos of those things, except i 
-guess if a special case arises
-
-- For now the save model callback is obviously just for the model and it used the keras save function, the load util
- does too, so when i add extra graph and model stuff when i get to the dueling dqn and the other algs i will need
- to see how to make it work (save the optimizer state and save the extra bit of model)
-'''
-
 from util import RunType
-import keras
+
 
 # Manager class for managing the signals (flags) and printing or updating the print calbacks based off of the flgas
 class PrintCallbacksManager:

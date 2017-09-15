@@ -1,13 +1,3 @@
-'''
-Outline:
-- Abstract base class at top
-- new class for every policy
-
-Current Work:
-- Epsilongreedy one is not cont. friendly cuz of action selection
-- find a way, if there is one, to make the eps variables constants
-'''
-
 import numpy as np
 from enum import Enum
 from math import exp
@@ -29,6 +19,7 @@ class Policy:
 
     def summary(self):
         raise NotImplementedError()
+
 
 class EpsilonGreedyPolicy(Policy):
     def __init__(self, init_eps=1.0, min_epsilon=0.01, decay=0.001):
@@ -69,6 +60,7 @@ class EpsilonGreedyPolicy(Policy):
     def summary(self):
         return 'Epsilon Greedy\nInitial Epsilon: {}\nEpsilon Lower Bound: {}\nEpsilon Decay Rate: {}'.format(self.MAX_EPS, self.MIN_EPS, self.DECAY)
 
+
 class RandomPolicy(Policy):
     def return_action(self, vals, mode):
         nb_actions = vals.shape[0]
@@ -79,6 +71,7 @@ class RandomPolicy(Policy):
 
     def summary(self):
         return 'Random\n'
+
 
 class GreedyPolicy(Policy):
     def return_action(self, vals, mode):

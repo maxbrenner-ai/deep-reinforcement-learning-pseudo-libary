@@ -2,31 +2,6 @@ from runner import Runner
 from keras import models
 from util import RunType
 import numpy as np
-
-'''
-CURRENT WORK:
-- Figure out how to use the **args and **kargs or whatever for making it so i can use default args in child classes
-without needing to put their def values in the child class init if i want it to be universal for all child classes
-
-
-Outline:
-- this is the base abstract class, the algorithms will be in seperate files
-- also contains methods like act, observe, remember ect.
-
-Notes:
-- act() assumes that all agents' models only use the state as input
-- for train i use num of steps, for test num of epsiodes, not sure if this is best
-- also for train and test might wanna add some other arguments such as steps for observing env (def is 1) ect.
-- figure out how to do soft updates for check_update_target_model
-- remember that in the training method of each specific alg if it uses replay to make sure the mem is full first *****
-- rn the memory stuff is in the base agent class but i might wanna make it per alg
-- im pretty sure i only need to compile the beh model cuz the tar model only ever uses predict aka its params are never optimized
-
-- REMEMBER: to set uses_replay to false or true in each specific agent init, ALSO set agent_type, Make sure all agents call and add to summary()
-- IMPORTANT: remember not to measure any metrics in these, only in callbacks, cuz of random memory fill
-
-- Not sure if reward clipping should be an arg for the agent or the train/test run
-'''
 from policy import EpsilonGreedyPolicy
 
 
@@ -56,6 +31,9 @@ class Agent:
         self.agent_type = None
         self.number_of_trained_steps = 0  # Total number of steps this agent has ever been trained for
         self.training_sess_nb_steps_ep_max = None  # This is what the ep run ceiling was set to while training
+
+    def check_env_compatibility(self, action_size, state_size):
+        raise NotImplementedError()
 
     # Abstract method
     def act(self, state):
