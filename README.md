@@ -8,6 +8,9 @@ Dependencies:
 - OpenAI Gym
 - Tensorflow >= 1.21 (GPU access for faster training)
 
+How to use:
+- Look at example.py for usage case
+
 Algorithms Currently Implemented:
 - DQN (https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf)
   - Double functionality (https://arxiv.org/abs/1509.06461)
