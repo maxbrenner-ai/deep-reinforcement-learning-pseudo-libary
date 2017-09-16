@@ -26,7 +26,9 @@ optimizer = Adam(lr=1e-2)
 
 # Make the policy and agent
 policy = EGP(0.95, 0.01, decay=0.003)
-agent = DQN(double_dqn=True, dueling_dqn=False, model=model, optimizer=optimizer, policy=policy, gamma=0.95, target_model_update_policy='soft', target_model_hard_policy_wait=200, target_model_soft_policy_constant=0.9, max_memory_length=1000)
+agent = DQN(double_dqn=True, dueling_dqn=False, model=model, optimizer=optimizer, policy=policy, 
+            gamma=0.95, target_model_update_policy='soft', target_model_hard_policy_wait=200, 
+            target_model_soft_policy_constant=0.9, max_memory_length=1000)
 
 # Make the callbacks
 rew_cb = PrintReward()
