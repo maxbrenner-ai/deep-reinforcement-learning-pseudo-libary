@@ -64,7 +64,7 @@ class DQN(Agent):
                 'Agent is not compatible with this env, number of input nodes not equal to state dim')
 
     def act(self, state):  # s.reshape(1, self.stateCnt)
-        output = self.beh_model.predict(state)[0]  # assumes all models only use state as input
+        output = self.beh_model.predict(state)[0]
         return self.currently_used_policy.return_action(output, ReturnActionType.Q_VALS)
 
     def remember(self, state, action, reward, next_state):
@@ -83,8 +83,6 @@ class DQN(Agent):
             target_f = self.beh_model.predict(state)
             target_f[0][action] = target
             self.beh_model.train_on_batch(state, target_f)
-            print("Start (BEH): \n\n{}\n\n End (BEH)...".format(self.beh_model.get_weights()[5]))
-            print("Start (TAR): \n\n{}\n\n End (TAR)...".format(self.tar_model.get_weights()[5]))
             # self.beh_model.fit(state, target_f, batch_size=self.batch_size, epochs=1, verbose=0)
 
     def summary(self):
