@@ -70,7 +70,6 @@ class DQN(Agent):
     def remember(self, state, action, reward, next_state):
         self.memory.add((state, action, reward, next_state))
 
-    # This updates the beh model params
     def update_params(self, step):
         minibatch = self.memory.sample(self.batch_size)
         for state, action, reward, next_state in minibatch:
