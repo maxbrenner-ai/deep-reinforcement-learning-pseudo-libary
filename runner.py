@@ -2,6 +2,7 @@ import numpy as np
 from policy import RandomPolicy, GreedyPolicy
 from callbacks import PrintCallbacksManager
 from util import RunType
+import time
 
 
 class Runner:
@@ -58,11 +59,10 @@ class Runner:
 
         current_total_step = 0
         current_episode = 1  # MUST START AT 1
-        current_ep_step, state = self.reset_eipsode(self.state_dim)
+        current_ep_step, state = self.reset_episode(self.state_dim)
 
         if self.allow_printing and self.run_type is not RunType.RAND_FILL:
             print("Episode {}...".format(current_episode))
-
         while self.check_loop(current_total_step):
 
             # Debug ----
@@ -76,6 +76,8 @@ class Runner:
                 self.env.render()
 
             next_state, reward, done, _ = self.env.step(action)
+            next_state = np.reshape(next_state, [1, self.state_dim])
+
             # Clips reward to [-1.0, 1.0] if clipping is on for the agent
             if self.agent.reward_clipping is True:
                 reward = np.clip(reward, -1.0, 1.0)
@@ -83,8 +85,6 @@ class Runner:
                 self.print_rew_cb.update(reward)
             if self.benchmark is not None:
                 self.benchmark.update(reward)
-
-            next_state = np.reshape(next_state, [1, self.state_dim])
 
             if done:
                 next_state = None
@@ -100,7 +100,7 @@ class Runner:
                     self.benchmark.update_end_of_ep(current_episode)
                     self.benchmark.output_to_file(False, current_episode, agent_summary=self.agent.summary(),
                                                   runner_summary=self.summary(False, current_total_step))
-                current_ep_step, state = self.reset_eipsode(self.state_dim)
+                current_ep_step, state = self.reset_episode(self.state_dim)
                 current_episode += 1
 
                 if self.allow_printing and self.run_type is not RunType.RAND_FILL:
@@ -144,7 +144,7 @@ class Runner:
         if self.run_type is RunType.TEST:
             self.agent.currently_used_policy = GreedyPolicy()
 
-    def reset_eipsode(self, state_size):
+    def reset_episode(self, state_size):
         return 0, np.reshape(self.env.reset(), [1, state_size])
 
     def check_loop(self, current_total_step):
@@ -169,7 +169,7 @@ class Runner:
             return
         # CURRENTLY: the update_implicit_policy is in the update_params method
         # if current_total_step % 10 == 0:
-        self.agent.update_params(current_total_step)
+        self.agent.update_params(self.state_dim, self.action_size)
         self.agent.update_implicit_policy(current_total_step)
 
         # this one can update on any step probs

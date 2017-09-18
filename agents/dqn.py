@@ -5,6 +5,7 @@ from util import AgentType
 from keras import models
 from keras.models import Model
 from keras.layers import *
+import numpy as np
 
 
 class DQN(Agent):
@@ -70,19 +71,25 @@ class DQN(Agent):
     def remember(self, state, action, reward, next_state):
         self.memory.add((state, action, reward, next_state))
 
-    def update_params(self, step):
+    def update_params(self, state_dim, action_size):
         minibatch = self.memory.sample(self.batch_size)
+        x = np.zeros((self.batch_size, state_dim))
+        y = np.zeros((self.batch_size, action_size))
+        index = 0
         for state, action, reward, next_state in minibatch:
-            target = reward
-            if next_state is not None:
+            target = self.beh_model.predict(state)[0]
+            if next_state is None:
+                target[action] = reward
+            else:
                 if not self.double_dqn:
-                    target = reward + self.gamma * np.amax(self.tar_model.predict(next_state)[0])
+                    target[action] = reward + self.gamma * np.amax(self.tar_model.predict(next_state)[0])
                 else:
-                    target = reward + self.gamma * self.tar_model.predict(next_state)[0][np.argmax(self.beh_model.predict(next_state)[0])]
-            target_f = self.beh_model.predict(state)
-            target_f[0][action] = target
-            self.beh_model.train_on_batch(state, target_f)
-            # self.beh_model.fit(state, target_f, batch_size=self.batch_size, epochs=1, verbose=0)
+                    target[action] = reward + self.gamma * self.tar_model.predict(next_state)[0][np.argmax(self.beh_model.predict(next_state)[0])]
+            x[index] = state
+            y[index] = target
+            index += 1
+        self.beh_model.train_on_batch(x, y)
+        # self.beh_model.fit(state, target_f, batch_size=self.batch_size, epochs=1, verbose=0)
 
     def summary(self):
         text = super().summary()
