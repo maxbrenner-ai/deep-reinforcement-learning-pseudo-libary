@@ -59,10 +59,11 @@ class Runner:
 
         current_total_step = 0
         current_episode = 1  # MUST START AT 1
-        current_ep_step, state = self.reset_episode(self.state_dim)
+        current_ep_step, state = self.reset_episode()
 
         if self.allow_printing and self.run_type is not RunType.RAND_FILL:
             print("Episode {}...".format(current_episode))
+
         while self.check_loop(current_total_step):
 
             # Debug ----
@@ -70,13 +71,12 @@ class Runner:
                 assert self.agent.memory.is_full(), "Replay agent's memory is NOT full while training."
             # ----------
 
-            action = self.agent.act(state)
+            action = self.agent.act(state, self.state_dim)
 
             if self.visualize:
                 self.env.render()
 
             next_state, reward, done, _ = self.env.step(action)
-            next_state = np.reshape(next_state, [1, self.state_dim])
 
             # Clips reward to [-1.0, 1.0] if clipping is on for the agent
             if self.agent.reward_clipping is True:
@@ -100,7 +100,7 @@ class Runner:
                     self.benchmark.update_end_of_ep(current_episode)
                     self.benchmark.output_to_file(False, current_episode, agent_summary=self.agent.summary(),
                                                   runner_summary=self.summary(False, current_total_step))
-                current_ep_step, state = self.reset_episode(self.state_dim)
+                current_ep_step, state = self.reset_episode()
                 current_episode += 1
 
                 if self.allow_printing and self.run_type is not RunType.RAND_FILL:
@@ -144,8 +144,8 @@ class Runner:
         if self.run_type is RunType.TEST:
             self.agent.currently_used_policy = GreedyPolicy()
 
-    def reset_episode(self, state_size):
-        return 0, np.reshape(self.env.reset(), [1, state_size])
+    def reset_episode(self):
+        return 0, self.env.reset()
 
     def check_loop(self, current_total_step):
         if self.run_type is RunType.RAND_FILL:

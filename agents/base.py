@@ -36,7 +36,7 @@ class Agent:
         raise NotImplementedError()
 
     # Abstract method
-    def act(self, state):
+    def act(self, state, state_dim):
         raise NotImplementedError()
 
     # This is still in the base class so i can have it in the runner, use pass if its not needed in a specific agent

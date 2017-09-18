@@ -64,8 +64,8 @@ class DQN(Agent):
             raise ValueError(
                 'Agent is not compatible with this env, number of input nodes not equal to state dim')
 
-    def act(self, state):  # s.reshape(1, self.stateCnt)
-        output = self.beh_model.predict(state)[0]
+    def act(self, state, state_dim):  # s.reshape(1, self.stateCnt)
+        output = self.beh_model.predict(state.reshape(1, state_dim)).flatten()
         return self.currently_used_policy.return_action(output, ReturnActionType.Q_VALS)
 
     def remember(self, state, action, reward, next_state):
@@ -73,23 +73,31 @@ class DQN(Agent):
 
     def update_params(self, state_dim, action_size):
         minibatch = self.memory.sample(self.batch_size)
+
+        blank_state = np.zeros(state_dim)
+
+        states = np.array([m[0] for m in minibatch])
+        states_ = np.array([(blank_state if m[3] is None else m[3]) for m in minibatch])
+
+        beh_predictions = self.beh_model.predict(states)
+        tar_predictions = self.tar_model.predict(states_)
+
         x = np.zeros((self.batch_size, state_dim))
         y = np.zeros((self.batch_size, action_size))
         index = 0
         for state, action, reward, next_state in minibatch:
-            target = self.beh_model.predict(state)[0]
+            target = beh_predictions[index]
             if next_state is None:
                 target[action] = reward
             else:
                 if not self.double_dqn:
-                    target[action] = reward + self.gamma * np.amax(self.tar_model.predict(next_state)[0])
+                    target[action] = reward + self.gamma * np.amax(tar_predictions[index])
                 else:
-                    target[action] = reward + self.gamma * self.tar_model.predict(next_state)[0][np.argmax(self.beh_model.predict(next_state)[0])]
+                    target[action] = reward + self.gamma * tar_predictions[index][np.argmax(beh_predictions[index])]
             x[index] = state
             y[index] = target
             index += 1
         self.beh_model.train_on_batch(x, y)
-        # self.beh_model.fit(state, target_f, batch_size=self.batch_size, epochs=1, verbose=0)
 
     def summary(self):
         text = super().summary()
