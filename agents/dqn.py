@@ -77,7 +77,7 @@ class DQN(Agent):
         blank_state = np.zeros(state_dim)
 
         states = np.array([m[0] for m in minibatch])
-        states_ = np.array([(blank_state if m[3] is None else m[3]) for m in minibatch])
+        states_ = np.array([blank_state if m[3] is None else m[3] for m in minibatch])
 
         beh_predictions = self.beh_model.predict(states)
         tar_predictions = self.tar_model.predict(states_)
