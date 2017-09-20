@@ -74,13 +74,14 @@ class DQN(Agent):
     def update_params(self, state_dim, action_size):
         minibatch = self.memory.sample(self.batch_size)
 
+        # We need this just as a placeholder for an empty state
         blank_state = np.zeros(state_dim)
 
         states = np.array([m[0] for m in minibatch])
-        states_ = np.array([blank_state if m[3] is None else m[3] for m in minibatch])
+        next_states = np.array([blank_state if m[3] is None else m[3] for m in minibatch])
 
         beh_predictions = self.beh_model.predict(states)
-        tar_predictions = self.tar_model.predict(states_)
+        tar_predictions = self.tar_model.predict(next_states)
 
         x = np.zeros((self.batch_size, state_dim))
         y = np.zeros((self.batch_size, action_size))

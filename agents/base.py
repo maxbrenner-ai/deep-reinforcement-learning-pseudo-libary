@@ -52,7 +52,7 @@ class Agent:
 
     def check_update_target_model(self, step):
         if self.target_model_update_policy == 'hard':
-            if step % self.target_model_hard_policy_wait == 0:
+            if (step % self.target_model_hard_policy_wait == 0) and step is not 0:
                 self.tar_model.set_weights(self.beh_model.get_weights())
         else:
             tau = self.target_model_soft_policy_constant

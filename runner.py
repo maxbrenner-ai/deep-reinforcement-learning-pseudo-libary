@@ -125,7 +125,7 @@ class Runner:
         if self.allow_printing:
             print("...Done")
         # At very end reset the policy
-        self.reset_policy()
+        self.agent.currently_used_policy = self.agent.policy
         # Refresh cbs in case they are used again
         self.cbmanager.refresh_cbs()
 
@@ -174,9 +174,6 @@ class Runner:
 
         # this one can update on any step probs
         self.agent.check_update_target_model(current_total_step)
-
-    def reset_policy(self):
-        self.agent.currently_used_policy = self.agent.policy
 
     def summary(self, end_of_run, current_step):
         text = ''
