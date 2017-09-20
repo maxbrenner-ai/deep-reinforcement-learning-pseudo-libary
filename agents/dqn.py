@@ -13,9 +13,10 @@ class DQN(Agent):
         super(DQN, self).__init__(*args, **kwargs)
 
         # NOTE: The dueling functionality of the DQN does not work yet ---
-        self.dueling_dqn = False
-        # if self.dueling_dqn:
-        #     self.construct_dueling_streams()
+        self.dueling_dqn = dueling_dqn
+        if self.dueling_dqn:
+            self.beh_model = self.construct_dueling_streams(self.beh_model)
+            self.tar_model = self.construct_dueling_streams(self.tar_model)
         # ----------------------------------------------------------------
 
         if max_memory_length < 1:
@@ -33,14 +34,13 @@ class DQN(Agent):
         self.agent_type = AgentType.DQN
 
     # This will take the second to last layer duplicate it, on one stream put the advantage part and the other the state
-    def construct_dueling_streams(self):
+    def construct_dueling_streams(self, model):
         # Check that second to last layer is dense if dueling is on
-        if type(self.beh_model.layers[-2]) is not Dense:
+        if type(model.layers[-2]) is not Dense:
             raise ValueError('Second to last model layer must be dense for dueling to work')
         # Check to make sure more than two layers
-        if len(self.beh_model.layers) < 2:
+        if len(model.layers) < 2:
             raise ValueError('Model needs more than two layers for dueling to work')
-        model = models.clone_model(self.beh_model)
 
         # Credit for this section goes to matthiasplappert https://github.com/matthiasplappert/keras-rl ----------
         nb_action = model.output._keras_shape[-1]
@@ -49,10 +49,9 @@ class DQN(Agent):
         outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.mean(a[:, 1:], keepdims=True),
                              output_shape=(nb_action,))(y)
         model = Model(input=model.input, output=outputlayer)
-        # - - - - - - - - - - - - - - - - - ----------------------------------------------------------------------
+        # - - - - - - - - - - - - - - - - - -----------------------------------------------------------------------
 
-        self.beh_model = models.clone_model(model)
-        self.tar_model = models.clone_model(model)
+        return model
 
     def check_env_compatibility(self, action_size, state_dim):
         # Make sure agent is compatible for this env
