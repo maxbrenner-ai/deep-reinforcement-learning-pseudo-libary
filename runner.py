@@ -35,9 +35,9 @@ class Runner:
 
         # Set training benchmark info
         if run_type is RunType.TRAIN:
-            agent.training_sess_nb_steps_ep_max = nb_steps_ep_max
+            self.agent.training_sess_nb_steps_ep_max = nb_steps_ep_max
 
-        assert agent.uses_replay is not None, "`uses_replay` is still `None`, need to set it."
+        assert self.agent.uses_replay is not None, "`uses_replay` is still None, need to set it."
 
     def run(self):
         if self.run_type is RunType.TRAIN:
@@ -71,7 +71,7 @@ class Runner:
                 assert self.agent.memory.is_full(), "Replay agent's memory is NOT full while training."
             # ----------
 
-            action = self.agent.act(state, self.state_dim)
+            action = self.agent.act(state)
 
             if self.visualize:
                 self.env.render()
@@ -169,7 +169,7 @@ class Runner:
             return
         # CURRENTLY: the update_implicit_policy is in the update_params method
         # if current_total_step % 10 == 0:
-        self.agent.update_params(self.state_dim, self.action_size)
+        self.agent.update_params()
         self.agent.update_implicit_policy(current_total_step)
 
         # this one can update on any step probs
