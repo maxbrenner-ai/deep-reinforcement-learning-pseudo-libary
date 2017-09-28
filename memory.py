@@ -4,13 +4,6 @@ from util import SumTree
 import numpy.random as rand
 
 
-'''
-Work on/Check:
-- Check to make sure the amount of LEAF nodes aka transitions is equal to the max_length
-- VERY IMPORTANT!!!!!!!! IDK if multiple of the same transntion should be allowed to be picked for replay, and need
-to check how random.sample works and the sumtree collection
-'''
-
 # Abstract class
 class Memory:
     def add(self, sample, error):
@@ -22,6 +15,7 @@ class Memory:
 
     def update(self, *args):
         raise NotImplementedError
+        # Make sure returns []
 
     def is_full(self):
         raise NotImplementedError
@@ -40,7 +34,7 @@ class DequeMemory(Memory):
         return random.sample(self.storage, amount), []
 
     def update(self, *args):
-        pass
+        return []
 
     def is_full(self):
         if len(self.storage) == self.storage.maxlen:
@@ -53,12 +47,17 @@ class SumTreeMemory(Memory):
         self.a = priority_importance
         self.e = edge_add
         self.current_max_priority = None
+        self.current_min_priority = None
 
     def get_priority(self, error):
         return (error + self.e) ** self.a
 
     def update_max_prior(self, num):
         self.current_max_priority = max(self.current_max_priority, num) if self.current_max_priority is not None \
+            else num
+
+    def update_min_prior(self, num):
+        self.current_min_priority = min(self.current_min_priority, num) if self.current_min_priority is not None \
             else num
 
     # Send in None for error to use the current max prior.
@@ -69,6 +68,7 @@ class SumTreeMemory(Memory):
         else:
             p = self.get_priority(error)
             self.update_max_prior(p)
+            self.update_min_prior(p)
         self.storage.add(p, sample)
 
     def sample_batch(self, batch_size):
@@ -86,12 +86,16 @@ class SumTreeMemory(Memory):
         return data_batch, index_batch
 
     def update(self, index_batch, error_batch):
+        new_prior = []
         size = len(index_batch)
         assert size is len(error_batch)
         for i in range(size):
             p = self.get_priority(error_batch[i])
+            new_prior.append(p)
             self.update_max_prior(p)
+            self.update_min_prior(p)
             self.storage.update(index_batch[i], p)
+        return new_prior
 
     def is_full(self):
         return self.storage.is_full

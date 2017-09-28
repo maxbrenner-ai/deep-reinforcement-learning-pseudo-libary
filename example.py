@@ -6,6 +6,7 @@ from keras.models import Sequential, Model
 from keras.layers import *
 import tensorflow as tf
 import gym
+from agents.dqn import PER
 
 '''
 This is an example of how to use these classes in conjunction with gym and keras
@@ -23,17 +24,25 @@ second_layer = Dense(24, activation='relu')(first_layer)
 third_layer = Dense(action_size, activation='linear')(second_layer)
 model = Model(input=input_layer, output=third_layer)
 
-# IMPORTANT: For now must use TF optimizers
+# Must use TF optimizers
 LEARNING_RATE = 1e-2
 tf_optimizer = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE)
 
 # Make the policy and agent
-policy = EGP(0.95, 0.01, decay=0.003)
-# This will make a dueling dqn AND auto add dueling streams to the arch. you send in
-agent = DQN(double_dqn=True, dueling_dqn=True, add_dueling_streams=True, model=model, optimizer=tf_optimizer,
+policy = EGP(init_eps=0.95, min_epsilon=0.01, decay=0.003)
+
+# If you want to use Prioritized Experience Replay can make a PER object or send in None for the PER arg. in the agent
+per = PER(priority_importance=0.6, initial_anneal=0.5, anneal_growth_rate=0.00008)
+
+# Make the Agent: Currently support DQN with the optional additions of Double, Dueling and Prioritized ER
+# If you make a model with two separate output streams for state value and action values just set 'dueling_dqn' to True
+# and set 'add_dueling_streams' to False, of you want dueling and made a normal model (no 2 streams) set them both to T
+
+# This will make a Double Dueling DQN with Prioritized Experience Replay
+agent = DQN(double_dqn=True, PER=per, dueling_dqn=True, add_dueling_streams=True, model=model, optimizer=tf_optimizer,
             policy=policy, state_dim=state_dim, action_size=action_size, gamma=0.95, target_model_update_policy='soft',
-            target_model_hard_policy_wait=200, target_model_soft_policy_constant=0.9, reward_clipping=True,
-            max_memory_length=1000)
+            target_model_hard_policy_wait=500, target_model_soft_policy_constant=0.9, reward_clipping=True,
+            batch_size=32, max_memory_length=1000)
 
 # Make the callbacks
 rew_cb = PrintReward()

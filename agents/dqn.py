@@ -7,22 +7,26 @@ from keras.models import Model
 from keras.layers import *
 import numpy as np
 import tensorflow as tf
+from math import exp
 
-'''
-- Might need to add TD-error clipping to [-1, 1]
-- Not sure if new class for PER just for holding values is a good idea, but they are only used if PER is in effect so
-i guess its fine
-- IDk what linearly annealing a start value of b to 1 means??????
-'''
+
 class PER:
-    def __init__(self, priority_importance=0.5, edge_add=0.1, initial_anneal=0.5):
-        self.a = priority_importance
-        self.e = edge_add
-        self.b = initial_anneal
+    # Can set growth to 0
+    def __init__(self, priority_importance=0.5, initial_anneal=0.5, anneal_growth_rate=0.00008):
+        self.a = priority_importance  # Constant
+        self.e = 0.1  # Constant
+        self.b = initial_anneal  # Can be Dyanmic
+        self.initial_anneal = initial_anneal  # Constant
+        self.growth = anneal_growth_rate  # Constant
+
+    # Linear anneal
+    def update_b(self):
+        self.b = self.b + (1.0 - self.initial_anneal) * self.growth
+        self.b = min(self.b, 1.0)
 
 
 class DQN(Agent):
-    def __init__(self, double_dqn=True, PER=PER(), dueling_dqn=False, add_dueling_streams=False, batch_size=32, max_memory_length=1000, *args, **kwargs):
+    def __init__(self, double_dqn=True, PER=None, dueling_dqn=False, add_dueling_streams=False, batch_size=32, max_memory_length=1000, *args, **kwargs):
         super(DQN, self).__init__(*args, **kwargs)
 
         if max_memory_length < 1:
@@ -34,42 +38,42 @@ class DQN(Agent):
         self.PER = PER
         if self.PER is None:
             self.memory = DequeMemory(max_memory_length)
+            self.using_PER = False
         else:
             self.memory = SumTreeMemory(max_memory_length, self.PER.a, self.PER.e)
+            self.using_PER = True
 
-        # Dueling set-up ------
         self.dueling_dqn = dueling_dqn
         # So the user can send in an arch that has the streams already made, if so just create the TF graph
         self.add_dueling_streams = add_dueling_streams
         if dueling_dqn is False and add_dueling_streams is True:
             raise ValueError("`add_dueling_streams` cannot be true if `dueling_dqn` is false")
-        if self.dueling_dqn:
-            self.sess = tf.Session()
-            K.set_session(self.sess)
-            # This says that I will handle the init i.e. will call global_variables_initializers() in sess.run
-            K.manual_variable_initialization(True)
-            self.create_placeholders()
-            if self.add_dueling_streams:
-                self.beh_model = self.construct_dueling_streams(self.beh_model)
-                # Reclone target model cuz the behavior model has been changed
-                self.tar_model = models.clone_model(self.beh_model)
-            self.create_beh_graph()
-            self.create_tar_graph()
-            self.sess.run(tf.global_variables_initializer())
-        # ---------------------
 
-        # Don't want to compile if dueling is true cuz TF is used for compiling then
-        if not dueling_dqn:
-            self.beh_model.compile(loss='mse', optimizer=self.optimizer)
+        # Compiling -------------------
+        self.sess = tf.Session()
+        K.set_session(self.sess)
+        # This says that I will handle the init i.e. will call global_variables_initializers() in sess.run
+        K.manual_variable_initialization(True)
+        self.create_placeholders()
+        if self.add_dueling_streams:
+            self.beh_model = self.construct_dueling_streams(self.beh_model)
+            # Reclone target model cuz the behavior model has been changed
+            self.tar_model = models.clone_model(self.beh_model)
+        self.create_beh_graph()
+        self.create_tar_graph()
+        self.sess.run(tf.global_variables_initializer())
+        # -----------------------------
 
+        self.max_memory_length = max_memory_length
         self.uses_replay = True
         self.agent_type = AgentType.DQN
 
-    # DUELING ----------------------------------------------------------------------------------------------------------
+    # COMPILING --------------------------------------------------------------------------------------------------------
 
     def create_placeholders(self):
-        self.states = tf.placeholder(tf.float32, shape=(None, self.state_dim), name='state')  # state
-        self.targets = tf.placeholder(tf.float32, shape=(None, self.action_size), name='target')  # q_vals
+        self.states = tf.placeholder(tf.float32, shape=(None, self.state_dim), name='states')  # state
+        self.targets = tf.placeholder(tf.float32, shape=(None, self.action_size), name='targets')  # q_vals
+        self.IS_weights = tf.placeholder(tf.float32, shape=(None, 1), name='IS_weights')  # For PER
 
     # This will take the second to last layer duplicate it, on one stream put the advantage part and the other the state
     def construct_dueling_streams(self, model):
@@ -85,17 +89,29 @@ class DQN(Agent):
         return model
 
     def create_beh_graph(self):
-        a_out, s_out = self.beh_model(self.states)
-        self.beh_output = s_out + tf.subtract(a_out, tf.reduce_mean(a_out, reduction_indices=1, keep_dims=True))
-        # MSE (target - output)^2, reduce_mean OR reduce_sum IDK!
-        loss = tf.reduce_mean(tf.square(tf.subtract(self.targets, self.beh_output)))
+        if self.dueling_dqn:
+            a_out, s_out = self.beh_model(self.states)
+            self.beh_output = s_out + tf.subtract(a_out, tf.reduce_mean(a_out, axis=1, keep_dims=True))
+        else:
+            self.beh_output = self.beh_model(self.states)
+
+        loss = tf.square(tf.subtract(self.targets, self.beh_output))  # MSE
+
+        # Need to multiply the losses by the IS weights if using PER
+        if self.using_PER:
+            loss = tf.multiply(self.IS_weights, loss)
+
+        loss = tf.reduce_mean(loss)
 
         optimizer = self.optimizer
         self.minimize = optimizer.minimize(loss)
 
     def create_tar_graph(self):
-        a_out, s_out = self.tar_model(self.states)
-        self.tar_output = s_out + tf.subtract(a_out, tf.reduce_mean(a_out, reduction_indices=1, keep_dims=True))
+        if self.dueling_dqn:
+            a_out, s_out = self.tar_model(self.states)
+            self.tar_output = s_out + tf.subtract(a_out, tf.reduce_mean(a_out, axis=1, keep_dims=True))
+        else:
+            self.tar_output = self.tar_model(self.states)
 
     # ------------------------------------------------------------------------------------------------------------------
 
@@ -123,16 +139,10 @@ class DQN(Agent):
         self.memory.add(sample, error=error)
 
     def predict(self, states, target):
-        if self.dueling_dqn:
-            if not target:
-                return self.sess.run(self.beh_output, {self.states: states})
-            else:
-                return self.sess.run(self.tar_output, {self.states: states})
+        if not target:
+            return self.sess.run(self.beh_output, {self.states: states})
         else:
-            if not target:
-                return self.beh_model.predict(states)
-            else:
-                return self.tar_model.predict(states)
+            return self.sess.run(self.tar_output, {self.states: states})
 
     # Private method
     def return_inputs_targets_errors(self, minibatch):
@@ -172,19 +182,34 @@ class DQN(Agent):
         minibatch_data, minibatch_indices = self.memory.sample_batch(self.batch_size)
         (x, y, errors) = self.return_inputs_targets_errors(minibatch_data)
         # Update the priorities
-        self.memory.update(minibatch_indices, errors)
-        if not self.dueling_dqn:
-            self.beh_model.train_on_batch(x, y)
-        else:
-            feed_dict = {self.states: x, self.targets: y}
-            self.sess.run(self.minimize, feed_dict)
+        priors = self.memory.update(minibatch_indices, errors)
 
+        # Make the IS Weights
+        if self.using_PER:
+            max_prior_weight = (self.max_memory_length * self.memory.current_min_priority) ** -self.PER.b
+            is_weights = []
+            for p in priors:
+                new_weight = (self.max_memory_length * p) ** -self.PER.b
+                new_weight = new_weight/max_prior_weight
+                is_weights.append([new_weight])
+            # Increase b
+            self.PER.update_b()
+        else:
+            is_weights = [[0]]
+
+        feed_dict = {self.states: x, self.targets: y, self.IS_weights: is_weights}
+        self.sess.run(self.minimize, feed_dict)
 
     def summary(self):
         text = super().summary()
-        text += 'Double option used: {}\n'.format(self.double_dqn)
-        text += 'Dueling option used: {}\n'.format(self.dueling_dqn)
-        text += 'Added dueling streams: {}\n'.format(self.add_dueling_streams)
-        text += 'Memory replay batch size: {}\n'.format(self.batch_size)
-        text += 'Memory length: {}\n'.format(self.memory.storage.maxlen)
+        text += "Double option used: {}\n".format(self.double_dqn)
+        text += "Prioritized Experience Replay used: {}\n".format(self.using_PER)
+        if self.using_PER:
+            text += "Priority importance(a): {}\n".format(self.PER.a)
+            text += "Initial annealing constant(b): {}\n".format(self.PER.initial_anneal)
+            text += "Anneal growth rate: {}\n".format(self.PER.growth)
+        text += "Dueling option used: {}\n".format(self.dueling_dqn)
+        text += "Added dueling streams: {}\n".format(self.add_dueling_streams)
+        text += "Memory replay batch size: {}\n".format(self.batch_size)
+        text += "Memory length: {}\n".format(self.max_memory_length)
         return text

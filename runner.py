@@ -179,7 +179,7 @@ class Runner:
         self.agent.check_update_target_model(current_total_step)
 
     def summary(self, end_of_run, current_step):
-        text = ''
+        text = ""
         text += "Train Run Info:\n"
         text += "Total number of steps trained: {}\n".format(self.agent.number_of_trained_steps)
         text += "Max number of steps allowed per episode: {}\n\n".format(
@@ -187,7 +187,7 @@ class Runner:
             'No Limit')
 
         text += "Test Run Data:\n"
-        text += 'Environment: {}\n'.format(self.env)
+        text += "Environment: {}\n".format(self.env)
         text += "Total number of steps tested: {}\n".format((current_step + 1) if end_of_run is False else current_step)
         text += "Max number of steps allowed per episode: {}\n".format(
             self.nb_steps_ep_max if self.nb_steps_ep_max is not None else 'No Limit')
