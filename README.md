@@ -18,9 +18,9 @@ python examples/dqn_cartpole.py
 - DQN [[1](https://www.cs.toronto.edu/~vmnih/docs/dqn.pdf)]
 - Double DQN [[2](https://arxiv.org/abs/1509.06461)]
 - Dueling DQN [[3](https://arxiv.org/abs/1511.06581)]
+- Prioritized Experience Replay [[4](https://arxiv.org/pdf/1511.05952.pdf)]
 
 ## Algorithms to add next:
-- Prioritized Experience Replay [[4](https://arxiv.org/pdf/1511.05952.pdf)]
 - Deep Recurrent Q-Learning (DRQN) [[5](https://arxiv.org/pdf/1507.06527.pdf)]
 - DDPG [[6](https://arxiv.org/pdf/1509.02971)]
 - A3C [[7](https://arxiv.org/abs/1602.01783)]
