@@ -1,6 +1,6 @@
 from agents.base import Agent
 from policy import ReturnActionType
-from memory import Memory
+from memory import DequeMemory, SumTreeMemory
 from util import AgentType
 from keras import models
 from keras.models import Model
@@ -9,17 +9,20 @@ import numpy as np
 import tensorflow as tf
 
 '''
-TF TIP: Dont use context manager for complex stuff like this, just make the session and save it as an instance var,
-also MAKE SURE to run the init AFTER the models and graphs are made, otherwise it will complain and say the keras
-layer params arent initialized when you try to call sess.run next, i.e. need to make sure the graph actually has
-all parts of the model and graph set up before you can initialize the vars. Also so you need to do K.set_session
-with the TF session your using so when your updating the params the loss will actually be optimized in the keras
-model params, otherwise it seems like it just doesnt optimize the keras model params cuz keras is not registered with
-the session you are using to make and init the vars
+- Might need to add TD-error clipping to [-1, 1]
+- Not sure if new class for PER just for holding values is a good idea, but they are only used if PER is in effect so
+i guess its fine
+- IDk what linearly annealing a start value of b to 1 means??????
 '''
+class PER:
+    def __init__(self, priority_importance=0.5, edge_add=0.1, initial_anneal=0.5):
+        self.a = priority_importance
+        self.e = edge_add
+        self.b = initial_anneal
+
 
 class DQN(Agent):
-    def __init__(self, double_dqn=True, dueling_dqn=False, add_dueling_streams=False, batch_size=32, max_memory_length=1000, *args, **kwargs):
+    def __init__(self, double_dqn=True, PER=PER(), dueling_dqn=False, add_dueling_streams=False, batch_size=32, max_memory_length=1000, *args, **kwargs):
         super(DQN, self).__init__(*args, **kwargs)
 
         if max_memory_length < 1:
@@ -28,8 +31,11 @@ class DQN(Agent):
             raise ValueError('`batch_size` is < 1 or > `max_memory_length`')
         self.batch_size = batch_size
         self.double_dqn = double_dqn
-
-        self.memory = Memory(max_memory_length)
+        self.PER = PER
+        if self.PER is None:
+            self.memory = DequeMemory(max_memory_length)
+        else:
+            self.memory = SumTreeMemory(max_memory_length, self.PER.a, self.PER.e)
 
         # Dueling set-up ------
         self.dueling_dqn = dueling_dqn
@@ -107,8 +113,14 @@ class DQN(Agent):
         output = self.predict(state.reshape(1, self.state_dim), target=False).flatten()
         return self.currently_used_policy.return_action(output, ReturnActionType.Q_VALS)
 
-    def remember(self, state, action, reward, next_state):
-        self.memory.add((state, action, reward, next_state))
+    def remember(self, state, action, reward, next_state, get_error):
+        sample = (state, action, reward, next_state)
+        # If get_error is true than get the TD error and send it in
+        error =  None
+        if get_error and type(self.memory) is SumTreeMemory:
+            (_,  _, errors) = self.return_inputs_targets_errors([sample])
+            error = errors[0] # Will be a list so just get first element
+        self.memory.add(sample, error=error)
 
     def predict(self, states, target):
         if self.dueling_dqn:
@@ -122,9 +134,8 @@ class DQN(Agent):
             else:
                 return self.tar_model.predict(states)
 
-    def update_params(self):
-        minibatch = self.memory.sample(self.batch_size)
-
+    # Private method
+    def return_inputs_targets_errors(self, minibatch):
         # We need this just as a placeholder for an empty state
         blank_state = np.zeros(self.state_dim)
 
@@ -136,9 +147,12 @@ class DQN(Agent):
 
         x = np.zeros((self.batch_size, self.state_dim))
         y = np.zeros((self.batch_size, self.action_size))
+        td_errors = np.zeros(self.batch_size)
         index = 0
+
         for state, action, reward, next_state in minibatch:
             target = beh_predictions[index]
+            old_value = target[action]  # The original
             if next_state is None:
                 target[action] = reward
             else:
@@ -146,14 +160,25 @@ class DQN(Agent):
                     target[action] = reward + self.gamma * np.amax(tar_predictions[index])
                 else:
                     target[action] = reward + self.gamma * tar_predictions[index][np.argmax(beh_predictions[index])]
+
             x[index] = state
             y[index] = target
+            td_errors[index] = abs(target[action] - old_value)  # Gets the |TD Error|
             index += 1
+
+        return (x, y, td_errors)
+
+    def update_params(self):
+        minibatch_data, minibatch_indices = self.memory.sample_batch(self.batch_size)
+        (x, y, errors) = self.return_inputs_targets_errors(minibatch_data)
+        # Update the priorities
+        self.memory.update(minibatch_indices, errors)
         if not self.dueling_dqn:
             self.beh_model.train_on_batch(x, y)
         else:
             feed_dict = {self.states: x, self.targets: y}
             self.sess.run(self.minimize, feed_dict)
+
 
     def summary(self):
         text = super().summary()

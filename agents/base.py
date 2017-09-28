@@ -48,7 +48,7 @@ class Agent:
         raise NotImplementedError()
 
     # This is still in the base class so i can have it in the runner, use pass if its not needed in a specific agent
-    def remember(self, state, action, reward, next_state):
+    def remember(self, state, action, reward, next_state, get_error):
         raise NotImplementedError()
 
     # Abstract method

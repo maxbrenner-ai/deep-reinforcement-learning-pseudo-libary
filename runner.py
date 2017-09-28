@@ -39,6 +39,10 @@ class Runner:
 
         assert self.agent.uses_replay is not None, "`uses_replay` is still None, need to set it."
 
+        # This is for PER, i want to set the first some odd errors/priorities for rand fill
+        # It will stop at this or whatever the length of the memory is if its less than set_errors_max_step
+        self.set_errors_max_step = 500
+
     def run(self):
         if self.run_type is RunType.TRAIN:
             assert self.agent.currently_used_policy is self.agent.policy, \
@@ -66,11 +70,6 @@ class Runner:
 
         while self.check_loop(current_total_step):
 
-            # Debug ----
-            if self.agent.uses_replay is True and self.run_type is RunType.TRAIN:
-                assert self.agent.memory.is_full(), "Replay agent's memory is NOT full while training."
-            # ----------
-
             action = self.agent.act(state)
 
             if self.visualize:
@@ -89,7 +88,7 @@ class Runner:
             if done:
                 next_state = None
 
-            self.remember(state, action, reward, next_state)
+            self.remember(state, action, reward, next_state, current_total_step)
 
             self.update_models_and_policy(current_total_step)
 
@@ -159,10 +158,14 @@ class Runner:
             else:
                 return True
 
-    def remember(self, state, action, reward, next_state):
+    def remember(self, state, action, reward, next_state, current_step):
         if self.run_type is RunType.TEST:
             return
-        self.agent.remember(state, action, reward, next_state)
+        # Set the error of the transition
+        set_errors = False
+        if current_step < self.set_errors_max_step and self.run_type is RunType.RAND_FILL:
+            set_errors = True
+        self.agent.remember(state, action, reward, next_state, set_errors)
 
     def update_models_and_policy(self, current_total_step):
         if self.run_type is RunType.RAND_FILL or self.run_type is RunType.TEST:
