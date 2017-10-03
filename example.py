@@ -41,8 +41,8 @@ per = PER(priority_importance=0.6, initial_anneal=0.5, anneal_growth_rate=0.0000
 # This will make a Double Dueling DQN with Prioritized Experience Replay
 agent = DQN(double_dqn=True, PER=per, dueling_dqn=True, add_dueling_streams=True, model=model, optimizer=tf_optimizer,
             policy=policy, state_dim=state_dim, action_size=action_size, gamma=0.95, target_model_update_policy='soft',
-            target_model_hard_policy_wait=500, target_model_soft_policy_constant=0.9, reward_clipping=True,
-            batch_size=32, max_memory_length=1000)
+            target_model_hard_policy_wait=500, target_model_soft_policy_constant=0.9, replay_period_wait=1,
+            reward_clipping=True, huber_loss=False, batch_size=32, max_memory_length=1000)
 
 # Make the callbacks
 rew_cb = PrintReward()

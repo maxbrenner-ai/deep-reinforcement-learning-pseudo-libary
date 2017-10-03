@@ -170,12 +170,9 @@ class Runner:
     def update_models_and_policy(self, current_total_step):
         if self.run_type is RunType.RAND_FILL or self.run_type is RunType.TEST:
             return
-        # CURRENTLY: the update_implicit_policy is in the update_params method
-        # if current_total_step % 10 == 0:
-        self.agent.update_params()
+        if current_total_step % self.agent.replay_period_wait == 0:
+            self.agent.update_params()
         self.agent.update_implicit_policy(current_total_step)
-
-        # this one can update on any step probs
         self.agent.check_update_target_model(current_total_step)
 
     def summary(self, end_of_run, current_step):
