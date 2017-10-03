@@ -26,13 +26,15 @@ class PER:
 
 
 class DQN(Agent):
-    def __init__(self, double_dqn=True, PER=None, dueling_dqn=False, add_dueling_streams=False, batch_size=32, max_memory_length=1000, *args, **kwargs):
+    def __init__(self, double_dqn=True, PER=None, dueling_dqn=False, add_dueling_streams=False, huber_loss=False,
+                 batch_size=32, max_memory_length=1000, *args, **kwargs):
         super(DQN, self).__init__(*args, **kwargs)
 
         if max_memory_length < 1:
             raise ValueError('`max_memory_length` is < 1.')
         if batch_size < 1 or batch_size > max_memory_length:
             raise ValueError('`batch_size` is < 1 or > `max_memory_length`')
+        self.huber_loss = huber_loss
         self.batch_size = batch_size
         self.double_dqn = double_dqn
         self.PER = PER
@@ -72,8 +74,9 @@ class DQN(Agent):
 
     def create_placeholders(self):
         self.states = tf.placeholder(tf.float32, shape=(None, self.state_dim), name='states')  # state
-        self.targets = tf.placeholder(tf.float32, shape=(None, self.action_size), name='targets')  # q_vals
-        self.IS_weights = tf.placeholder(tf.float32, shape=(None, 1), name='IS_weights')  # For PER
+        self.actions = tf.placeholder(tf.int32, shape=(None,), name='actions')
+        self.targets = tf.placeholder(tf.float32, shape=(None,), name='targets')  # q_vals
+        self.IS_weights = tf.placeholder(tf.float32, shape=(None,), name='IS_weights')  # For PER
 
     # This will take the second to last layer duplicate it, on one stream put the advantage part and the other the state
     def construct_dueling_streams(self, model):
@@ -95,8 +98,19 @@ class DQN(Agent):
         else:
             self.beh_output = self.beh_model(self.states)
 
-        loss = tf.square(tf.subtract(self.targets, self.beh_output))  # MSE
+        # Index outputs by actions and convert shape to a vector
+        outputs_vec = tf.reduce_sum(tf.multiply(tf.one_hot(self.actions, self.action_size), self.beh_output), axis=1)
+        errors = tf.subtract(self.targets, outputs_vec)
 
+        if self.huber_loss:
+            td_errors = tf.abs(errors)
+            quadratic_part = tf.minimum(td_errors, 1.0)
+            first = 0.5 * tf.square(quadratic_part)
+            second = 1.0 * tf.subtract(td_errors, quadratic_part)
+            loss = tf.add(first, second)
+        else:
+            # MSE
+            loss = tf.square(errors)
         # Need to multiply the losses by the IS weights if using PER
         if self.using_PER:
             loss = tf.multiply(self.IS_weights, loss)
@@ -134,7 +148,7 @@ class DQN(Agent):
         # If get_error is true than get the TD error and send it in
         error =  None
         if get_error and type(self.memory) is SumTreeMemory:
-            (_,  _, errors) = self.return_inputs_targets_errors([sample])
+            (_,  _, _, errors) = self.return_inputs_targets_errors([sample])
             error = errors[0] # Will be a list so just get first element
         self.memory.add(sample, error=error)
 
@@ -156,31 +170,32 @@ class DQN(Agent):
         tar_predictions = self.predict(next_states, True)
 
         x = np.zeros((self.batch_size, self.state_dim))
-        y = np.zeros((self.batch_size, self.action_size))
+        y = np.zeros(self.batch_size)
+        actions = np.zeros(self.batch_size)
         td_errors = np.zeros(self.batch_size)
         index = 0
 
         for state, action, reward, next_state in minibatch:
-            target = beh_predictions[index]
-            old_value = target[action]  # The original
+            # target = beh_predictions[index]
+            old_value = beh_predictions[index][action]  # The original
             if next_state is None:
-                target[action] = reward
+                target = reward
             else:
                 if not self.double_dqn:
-                    target[action] = reward + self.gamma * np.amax(tar_predictions[index])
+                    target = reward + self.gamma * np.amax(tar_predictions[index])
                 else:
-                    target[action] = reward + self.gamma * tar_predictions[index][np.argmax(beh_predictions[index])]
-
+                    target = reward + self.gamma * tar_predictions[index][np.argmax(beh_predictions[index])]
             x[index] = state
             y[index] = target
-            td_errors[index] = abs(target[action] - old_value)  # Gets the |TD Error|
+            actions[index] = action
+            td_errors[index] = abs(target - old_value)  # Gets the |TD Error|
             index += 1
 
-        return (x, y, td_errors)
+        return (x, y, actions, td_errors)
 
     def update_params(self):
         minibatch_data, minibatch_indices = self.memory.sample_batch(self.batch_size)
-        (x, y, errors) = self.return_inputs_targets_errors(minibatch_data)
+        (x, y, actions, errors) = self.return_inputs_targets_errors(minibatch_data)
         # Update the priorities
         priors = self.memory.update(minibatch_indices, errors)
 
@@ -191,13 +206,13 @@ class DQN(Agent):
             for p in priors:
                 new_weight = (self.max_memory_length * p) ** -self.PER.b
                 new_weight = new_weight/max_prior_weight
-                is_weights.append([new_weight])
+                is_weights.append(new_weight)
             # Increase b
             self.PER.update_b()
         else:
-            is_weights = [[0]]
+            is_weights = [0]
 
-        feed_dict = {self.states: x, self.targets: y, self.IS_weights: is_weights}
+        feed_dict = {self.states: x, self.targets: y, self.actions: actions, self.IS_weights: is_weights}
         self.sess.run(self.minimize, feed_dict)
 
     def summary(self):
