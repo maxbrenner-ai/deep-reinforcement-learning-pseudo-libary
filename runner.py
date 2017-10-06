@@ -11,9 +11,12 @@ class Runner:
         self.run_type = run_type
         self.agent = agent
         self.env = env
-        self.state_dim = env.observation_space.shape[0]
-        self.action_size = env.action_space.n
-        self.agent.check_env_compatibility(action_size=self.action_size, state_dim=self.state_dim)
+
+        # Check agent compatibility with env
+        action_size = env.action_space.n
+        state_shape = env.observation_space.shape
+        self.agent.check_env_compatibility(action_size=action_size, state_shape=state_shape)
+
         self.nb_steps = nb_steps
         self.nb_steps_ep_max = nb_steps_ep_max
 
@@ -76,6 +79,8 @@ class Runner:
                 self.env.render()
 
             next_state, reward, done, _ = self.env.step(action)
+            # Process the state
+            next_state = self.agent.state_processor.process_state(next_state, self.agent.sess, state)
 
             # Clips reward to [-1.0, 1.0] if clipping is on for the agent
             if self.agent.reward_clipping is True:
@@ -144,7 +149,8 @@ class Runner:
             self.agent.currently_used_policy = GreedyPolicy()
 
     def reset_episode(self):
-        return 0, self.env.reset()
+        reset_state = self.env.reset()
+        return 0, self.agent.state_processor.process_state(reset_state, self.agent.sess, None)
 
     def check_loop(self, current_total_step):
         if self.run_type is RunType.RAND_FILL:

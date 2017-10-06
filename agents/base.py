@@ -8,7 +8,7 @@ import keras.backend as K
 
 
 class Agent:
-    def __init__(self, model, optimizer, policy, state_dim, action_size, gamma=0.95, target_model_update_policy='soft',
+    def __init__(self, model, optimizer, policy, action_size, state_processor, gamma=0.95, target_model_update_policy='soft',
                  target_model_hard_policy_wait=1000, target_model_soft_policy_constant=0.9, replay_period_wait=1,
                  reward_clipping=True):
         if target_model_hard_policy_wait < 1:
@@ -23,8 +23,7 @@ class Agent:
         self.optimizer = optimizer
         self.policy = policy
 
-        # For now state_dim and action_size need to be explicitly send in
-        self.state_dim = state_dim
+        self.state_processor = state_processor
         self.action_size = action_size
 
         self.currently_used_policy = None  # this is for temp setting it to like random for mem filling or greedy for testing
@@ -100,7 +99,7 @@ class Agent:
         text += "Model details: MODEL SUMMARIZER NOT IMPLEMENTED YET\n"
         # agent.beh_model.summary(print_fn=lambda x: f.write(x + '\n'))
         text += "Policy: {}\n".format(self.policy.summary())
-        text += 'State dimension: {}\n'.format(self.state_dim)
+        text += self.state_processor.summary()
         text += 'Action size: {}\n'.format(self.action_size)
         text += "Gamma: {}\n".format(self.gamma)
         text += "Target model update type: {}\n".format(self.target_model_update_policy.title())

@@ -73,8 +73,9 @@ class DQN(Agent):
     # COMPILING --------------------------------------------------------------------------------------------------------
 
     def create_placeholders(self):
-        self.states = tf.placeholder(tf.float32, shape=(None, self.state_dim), name='states')  # state
-        self.actions = tf.placeholder(tf.int32, shape=(None,), name='actions')
+        state_shape = (None,) + self.state_processor.state_shape
+        self.states = tf.placeholder(tf.float32, shape=state_shape, name='states')  # state
+        self.actions = tf.placeholder(tf.uint8, shape=(None,), name='actions')
         self.targets = tf.placeholder(tf.float32, shape=(None,), name='targets')  # q_vals
         self.IS_weights = tf.placeholder(tf.float32, shape=(None,), name='IS_weights')  # For PER
 
@@ -129,18 +130,19 @@ class DQN(Agent):
 
     # ------------------------------------------------------------------------------------------------------------------
 
-    def check_env_compatibility(self, action_size, state_dim):
+    def check_env_compatibility(self, action_size, state_shape):
         # Make sure agent is compatible for this env
         # Check to make sure last layer's number of nodes is equal to number of actions
         if self.action_size is not action_size:
             raise ValueError(
-                'Agent is not compatible with this env, number of output nodes not equal to num of actions')
-        if self.state_dim is not state_dim:
+                "Agent is not compatible with this env, action sizes don't match up")
+        if len(self.state_processor.state_shape) is not len(state_shape):
             raise ValueError(
-                'Agent is not compatible with this env, number of input nodes not equal to state dim')
+                "Agent is not compatible with this env, state dim. numbers don't match up")
 
-    def act(self, state):  # s.reshape(1, self.stateCnt)
-        output = self.predict(state.reshape(1, self.state_dim), target=False).flatten()
+    def act(self, state):
+        new_shape = (1,) + self.state_processor.state_shape
+        output = self.predict(state.reshape(new_shape), target=False).flatten()
         return self.currently_used_policy.return_action(output, ReturnActionType.Q_VALS)
 
     def remember(self, state, action, reward, next_state, get_error):
@@ -161,15 +163,14 @@ class DQN(Agent):
     # Private method
     def return_inputs_targets_errors(self, minibatch):
         # We need this just as a placeholder for an empty state
-        blank_state = np.zeros(self.state_dim)
-
+        blank_state = np.zeros(shape=self.state_processor.state_shape)
         states = np.array([m[0] for m in minibatch])
         next_states = np.array([blank_state if m[3] is None else m[3] for m in minibatch])
 
         beh_predictions = self.predict(states, False)
         tar_predictions = self.predict(next_states, True)
 
-        x = np.zeros((self.batch_size, self.state_dim))
+        x = np.zeros(shape=((self.batch_size,) + self.state_processor.state_shape))
         y = np.zeros(self.batch_size)
         actions = np.zeros(self.batch_size)
         td_errors = np.zeros(self.batch_size)
