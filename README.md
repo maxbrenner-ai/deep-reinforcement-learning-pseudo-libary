@@ -9,7 +9,7 @@ This is an in-development sort-of-library for Reinforcement Learning. It is simi
 - Tensorflow >= 1.21 (GPU access for faster training)
 
 ## How to use:
-You can run and look at this example:
+You can run and look at these examples:
 ```
 python examples/cartpole_example.py
 ```
