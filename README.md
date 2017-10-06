@@ -11,7 +11,10 @@ This is an in-development sort-of-library for Reinforcement Learning. It is simi
 ## How to use:
 You can run and look at this example:
 ```
-python examples/dqn_cartpole.py
+python examples/cartpole_example.py
+```
+```
+python examples/pong_example.py
 ```
 
 ## Algorithms Currently Implemented:
