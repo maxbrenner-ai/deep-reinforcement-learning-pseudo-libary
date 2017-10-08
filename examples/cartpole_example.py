@@ -27,7 +27,7 @@ third_layer = Dense(action_size, activation='linear')(second_layer)
 model = Model(input=input_layer, output=third_layer)
 
 # You could also use this if you wanted dueling to be on, but not auto add the streams behind the scenes
-# input_layer = Input(shape=(state_dim,))
+# input_layer = Input(shape=state_shape)
 # first_layer = Dense(128, activation='relu')(input_layer)
 # second_layer = Dense(128, activation='relu')(first_layer)
 # adv_stream = Dense(action_size, activation='linear')(second_layer)
